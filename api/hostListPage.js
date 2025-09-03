@@ -1,6 +1,6 @@
 
 // backend/controllers/hostController.js
-const pool = require('../config/database'); // Your PostgreSQL connection pool
+import pool from "../client.js"; 
 
 // Helper function to get host with GST numbers
 const getHostWithGST = async (hostId) => {
@@ -144,7 +144,7 @@ const getHostWithGST = async (hostId) => {
 
 
 // 2. GET ALL HOSTS - GET /api/hosts
-const getAllHosts = async (req, res) => {
+export async function  getAllHosts  (req, res) {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
@@ -374,7 +374,7 @@ const updateHost = async (req, res) => {
 
 
 // 5. DELETE HOST - DELETE /api/hosts/:id
-const deleteHost = async (req, res) => {
+export async function deleteHost  (req, res) {
   try {
     const hostId = parseInt(req.params.id);
     
@@ -537,12 +537,12 @@ const deleteHost = async (req, res) => {
 
 
 
-module.exports = {
-//   createHost,
-  getAllHosts,
-//   getHostById,
-  updateHost,
-  deleteHost,
-//   searchHosts,
-//   getHostStats
-};
+// module.exports = {
+// //   createHost,
+//   getAllHosts,
+// //   getHostById,
+//   updateHost,
+//   // deleteHost,
+// //   searchHosts,
+// //   getHostStats
+// };
