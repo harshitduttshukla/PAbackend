@@ -1,6 +1,6 @@
 
 // backend/controllers/hostController.js
-import pool from "../client.js"; 
+import pool from "../../client.js"; 
 
 // Helper function to get host with GST numbers
 const getHostWithGST = async (hostId) => {
@@ -239,11 +239,9 @@ export async function  getAllHosts  (req, res) {
 
 
 
-const updateHost = async (req, res) => {
-//   const client = await pool.connect();
-  
+export async function  updateHost (req, res) {  
   try {
-    await client.query('BEGIN');
+    await pool.query('BEGIN');
     
     const hostId = parseInt(req.params.id);
     const {
@@ -263,7 +261,7 @@ const updateHost = async (req, res) => {
 
     // Check if host exists
     const existsQuery = 'SELECT host_id FROM host_information WHERE host_id = $1';
-    const existsResult = await client.query(existsQuery, [hostId]);
+    const existsResult = await pool.query(existsQuery, [hostId]);
     
     if (existsResult.rows.length === 0) {
       return res.status(404).json({
@@ -280,7 +278,7 @@ const updateHost = async (req, res) => {
       RETURNING *
     `;
     
-    const hostResult = await client.query(updateHostQuery, [
+    const hostResult = await pool.query(updateHostQuery, [
       host_name?.trim(),
       host_pan_number?.toUpperCase().trim(),
       rating || 0,
@@ -290,7 +288,7 @@ const updateHost = async (req, res) => {
     ]);
 
     // Delete existing GST numbers
-    await client.query('DELETE FROM host_gst_numbers WHERE host_id = $1', [hostId]);
+    await pool.query('DELETE FROM host_gst_numbers WHERE host_id = $1', [hostId]);
 
     // Insert new GST numbers
     const insertedGSTNumbers = [];
@@ -302,7 +300,7 @@ const updateHost = async (req, res) => {
             VALUES ($1, $2)
             RETURNING gst_number
           `;
-          const gstResult = await client.query(insertGSTQuery, [
+          const gstResult = await pool.query(insertGSTQuery, [
             hostId,
             gstNumber.toUpperCase().trim()
           ]);
@@ -311,7 +309,7 @@ const updateHost = async (req, res) => {
       }
     }
 
-    await client.query('COMMIT');
+    await pool.query('COMMIT');
 
     res.json({
       message: 'Host updated successfully',
@@ -322,7 +320,7 @@ const updateHost = async (req, res) => {
     });
 
   } catch (error) {
-    await client.query('ROLLBACK');
+    await pool.query('ROLLBACK');
     
     // Handle unique constraint violations
     if (error.code === '23505') {
@@ -342,7 +340,7 @@ const updateHost = async (req, res) => {
       error: 'Internal server error while updating host'
     });
   } finally {
-    client.release();
+    pool.release();
   }
 };
 

@@ -1,7 +1,7 @@
 import dotenv from "dotenv";
 dotenv.config();
 import { z } from "zod";
-import pool from "../client.js"; 
+import pool from "../../client.js"; 
 
 // ✅ Validation schema
 const hostSchema = z.object({
