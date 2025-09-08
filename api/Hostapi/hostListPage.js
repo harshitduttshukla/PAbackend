@@ -7,7 +7,7 @@ const getHostWithGST = async (hostId) => {
   try {
     // Get host information
     const hostQuery = `
-      SELECT host_id, host_name, host_pan_number, rating, host_email, 
+      SELECT host_id, host_name, host_owner_name, host_pan_number, rating, host_email, 
              host_contact_number, created_at
       FROM host_information 
       WHERE host_id = $1
@@ -158,7 +158,7 @@ export async function  getAllHosts  (req, res) {
 
     // Get hosts with pagination
     const hostsQuery = `
-      SELECT h.host_id, h.host_name, h.host_pan_number, h.rating, 
+      SELECT h.host_id, h.host_name,host_owner_name, h.host_pan_number, h.rating, 
              h.host_email, h.host_contact_number, h.created_at,
              COALESCE(
                JSON_AGG(
