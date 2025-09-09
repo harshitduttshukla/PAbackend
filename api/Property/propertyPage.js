@@ -39,7 +39,7 @@ export async function getHost(req, res) {
     }
 
     const hostQuery = `
-      SELECT host_id, host_name, host_pan_number, rating, host_email, 
+      SELECT host_id, host_name,host_owner_name, host_pan_number, rating, host_email, 
              host_contact_number, created_at
       FROM host_information 
       WHERE host_name ILIKE $1
