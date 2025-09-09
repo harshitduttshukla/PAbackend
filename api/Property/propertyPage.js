@@ -1,5 +1,6 @@
 
 import pool from "../../client.js"; 
+
 export async function getPinCode(req, res) {
   try {
     const pincode = req.query.pincode;
