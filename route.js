@@ -25,4 +25,8 @@ router.get("/properties",getallProperty);
 
 router.delete("/deleteProperty/:id",deleteProperty)
 
+
+// client
+import {insertClient} from "./api/Client/Clientinfo.js"
+router.post("/insertClient", insertClient);
 export default router;

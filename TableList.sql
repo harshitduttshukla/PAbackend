@@ -65,3 +65,30 @@ CREATE TABLE properties (
     CONSTRAINT fk_host FOREIGN KEY (host_id) REFERENCES host_information(host_id) ON DELETE CASCADE,
     CONSTRAINT fk_pincode FOREIGN KEY (pincode_id) REFERENCES pincodes(pincode_id) ON DELETE CASCADE
 );
+
+
+
+
+
+CREATE TABLE IF NOT EXISTS clients (
+    id SERIAL PRIMARY KEY,
+    active BOOLEAN DEFAULT true,
+    client_name VARCHAR(255) NOT NULL,
+    gst_no VARCHAR(50),
+    street_address TEXT,
+    street_address_2 TEXT,
+    city VARCHAR(100),
+    state VARCHAR(100),
+    zip_code VARCHAR(20),
+    phone_number VARCHAR(20),
+    fax_number VARCHAR(20),
+    mobile_number VARCHAR(20),
+    email_address VARCHAR(255) UNIQUE,  -- unique email
+    web_address VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Indexes
+    CONSTRAINT idx_client_name UNIQUE (client_name),
+    CONSTRAINT idx_email UNIQUE (email_address)
+);
