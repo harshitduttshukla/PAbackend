@@ -1,5 +1,5 @@
 
-// backend/controllers/hostController.js
+
 import pool from "../../client.js"; 
 
 // Helper function to get host with GST numbers

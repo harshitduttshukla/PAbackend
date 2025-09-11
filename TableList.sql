@@ -3,6 +3,7 @@
 CREATE TABLE host_information (
     host_id SERIAL PRIMARY KEY, -- Unique ID for each host (auto-increment)
     host_name VARCHAR(100) NOT NULL, -- Name of the host
+   -- add the host owner name 
     host_pan_number VARCHAR(20) UNIQUE NOT NULL, -- PAN (unique)
     rating DECIMAL(2,1) CHECK (rating >= 0 AND rating <= 5), -- Rating between 0 and 5
     host_email VARCHAR(100) UNIQUE NOT NULL, -- Unique email
@@ -27,6 +28,7 @@ CREATE TABLE host_gst_numbers (
 CREATE TABLE pincodes (
     pincode_id SERIAL PRIMARY KEY,
     pincode VARCHAR(10) UNIQUE NOT NULL
+    aadd the city 
 );
 
 

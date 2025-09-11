@@ -13,11 +13,16 @@ router.put("/updateHost/:id", updateHost);
 
 
 // property
-import { getPinCode,getHost,createProperty } from "./api/Property/propertyPage.js"
+import { getPinCode,getHost,createProperty } from "./api/Property/propertyinfo.js"
 router.get("/PinCode",getPinCode);
 router.get("/host",getHost);
 
 router.post("/properties", createProperty);
 
+import { getallProperty,deleteProperty} from "./api/Property/propertyListPage.js";
+
+router.get("/properties",getallProperty);
+
+router.delete("/deleteProperty/:id",deleteProperty)
 
 export default router;
