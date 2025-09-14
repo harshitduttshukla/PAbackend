@@ -14,6 +14,18 @@ router.put("/updateHost/:id", updateHost);
 
 // property
 import { getPinCode,getHost,createProperty } from "./api/Property/propertyinfo.js"
+import { Pincode } from "./api/Pincode/Pincodeinfo.js";
+import {AllPinCode} from "./api/Pincode/PincodeListPage.js"
+
+
+// pincode 
+router.post("/Pincode",Pincode)
+router.get("/AllPinCode",AllPinCode)
+
+
+
+
+
 router.get("/PinCode",getPinCode);
 router.get("/host",getHost);
 
@@ -29,4 +41,6 @@ router.delete("/deleteProperty/:id",deleteProperty)
 // client
 import {insertClient} from "./api/Client/Clientinfo.js"
 router.post("/insertClient", insertClient);
+
+
 export default router;

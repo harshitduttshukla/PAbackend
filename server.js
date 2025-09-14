@@ -2,11 +2,12 @@ import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 import dotenv from "dotenv";
-import rout from "./route.js"
-
-
+import rout from "./route.js";
 
 dotenv.config();
+
+// 🔍 Debugging ENV variables
+console.log("🔍 ENV:", process.env.DB_USERNAME, process.env.DB_NAME);
 
 const app = express();
 
@@ -14,10 +15,7 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-app.use("/api",rout);
-
-
-
+app.use("/api", rout);
 
 // ✅ Base route
 app.get("/", (req, res) => {
