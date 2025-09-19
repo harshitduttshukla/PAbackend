@@ -40,7 +40,14 @@ router.delete("/deleteProperty/:id",deleteProperty)
 
 // client
 import {insertClient} from "./api/Client/Clientinfo.js"
+import {ClientListPage,deleteClient,updateClient} from "./api/Client/ClientListPage.js"
+
+
 router.post("/insertClient", insertClient);
+
+router.get("/clients",ClientListPage);
+router.delete("/deleteClient/:id",deleteClient);
+router.put("/updateClient/:id",updateClient);
 
 
 export default router;
