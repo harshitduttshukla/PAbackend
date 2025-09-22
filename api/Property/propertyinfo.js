@@ -62,6 +62,102 @@ export async function getHost(req, res) {
 
 
 
+// export async function createProperty(req, res) {
+//   try {
+//     const {
+//       property_status,
+//       host_id,
+//       ivr_number,
+//       pincode_id,
+//       city,
+//       location,
+//       post_id,
+//       property_type,
+//       contact_person,
+//       contact_number,
+//       email_id,
+//       caretaker_name,
+//       caretaker_number,
+//       note,
+//       check_in_time,
+//       check_out_time,
+//       master_bedroom,
+//       common_bedroom,
+//       landmark,
+//       address1,
+//       address2,
+//       address3,
+//       thumbnail,
+//       property_url,
+//     } = req.body;
+
+//     // Basic validation
+//     if (!property_status || !host_id || !pincode_id) {
+//       return res.status(400).json({
+//         error: "property_status, host_id, and pincode_id are required fields",
+//       });
+//     }
+
+//     const insertQuery = `
+//       INSERT INTO properties (
+//         property_status, host_id, ivr_number, pincode_id, city, location,
+//         post_id, property_type, contact_person, contact_number, email_id,
+//         caretaker_name, caretaker_number, note, check_in_time, check_out_time,
+//         master_bedroom, common_bedroom, landmark, address1, address2, address3,
+//         thumbnail, property_url
+//       )
+//       VALUES (
+//         $1, $2, $3, $4, $5, $6,
+//         $7, $8, $9, $10, $11,
+//         $12, $13, $14, $15, $16,
+//         $17, $18, $19, $20, $21, $22,
+//         $23, $24
+//       )
+//       RETURNING property_id, property_status, host_id, pincode_id
+//     `;
+
+//     const values = [
+//       property_status,
+//       host_id,
+//       ivr_number,
+//       pincode_id,
+//       city,
+//       location,
+//       post_id,
+//       property_type,
+//       contact_person,
+//       contact_number,
+//       email_id,
+//       caretaker_name,
+//       caretaker_number,
+//       note,
+//       check_in_time,
+//       check_out_time,
+//       master_bedroom,
+//       common_bedroom,
+//       landmark,
+//       address1,
+//       address2,
+//       address3,
+//       thumbnail,
+//       property_url,
+//     ];
+
+//     const result = await pool.query(insertQuery, values);
+
+//     return res.status(201).json({
+//       message: "Property created successfully",
+//       property: result.rows[0],
+//     });
+//   } catch (error) {
+//     console.error("Error inserting property:", error);
+//     return res.status(500).json({ error: "Internal Server Error" });
+//   }
+// }
+
+
+
+
 export async function createProperty(req, res) {
   try {
     const {
@@ -98,6 +194,12 @@ export async function createProperty(req, res) {
       });
     }
 
+    // 🔥 Fix: Convert empty string to null for time fields
+    const safeCheckInTime =
+      check_in_time && check_in_time.trim() !== "" ? check_in_time : null;
+    const safeCheckOutTime =
+      check_out_time && check_out_time.trim() !== "" ? check_out_time : null;
+
     const insertQuery = `
       INSERT INTO properties (
         property_status, host_id, ivr_number, pincode_id, city, location,
@@ -131,8 +233,8 @@ export async function createProperty(req, res) {
       caretaker_name,
       caretaker_number,
       note,
-      check_in_time,
-      check_out_time,
+      safeCheckInTime,
+      safeCheckOutTime,
       master_bedroom,
       common_bedroom,
       landmark,
