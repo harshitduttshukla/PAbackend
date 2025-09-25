@@ -50,4 +50,14 @@ router.delete("/deleteClient/:id",deleteClient);
 router.put("/updateClient/:id",updateClient);
 
 
+// Reservation
+import {ClientList,getProperty,checkRoomAvailability,saveReservation} from "./api/ReservationManagement/ReservationInfo.js"
+
+router.get("/clientRM",ClientList);
+router.get("/Property",getProperty);
+router.get("/checkRoomAvailability",checkRoomAvailability);
+router.post("/saveReservation",saveReservation);
+
+
+
 export default router;
