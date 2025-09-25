@@ -100,7 +100,7 @@ CREATE TABLE reservations (
     id SERIAL PRIMARY KEY,
     reservation_no VARCHAR(50) UNIQUE NOT NULL,
     client_id INTEGER REFERENCES clients(id),
-    property_id INTEGER REFERENCES properties(id),
+    property_id INTEGER REFERENCES properties(property_id),
     guest_name VARCHAR(255) NOT NULL,
     guest_email VARCHAR(255),
     contact_number VARCHAR(20),
@@ -125,7 +125,7 @@ CREATE TABLE room_bookings (
     id SERIAL PRIMARY KEY,
     reservation_id INTEGER REFERENCES reservations(id),
     room_type VARCHAR(50) NOT NULL, -- 'masterBedroom1', 'masterBedroom2', 'masterBedroom3'
-    property_id INTEGER REFERENCES properties(id),
+    property_id INTEGER REFERENCES properties(property_id),
     check_in_date DATE NOT NULL,
     check_out_date DATE NOT NULL,
     status VARCHAR(20) DEFAULT 'active'
@@ -134,7 +134,7 @@ CREATE TABLE room_bookings (
 -- Property rooms table (to define available rooms in each property)
 CREATE TABLE property_rooms (
     id SERIAL PRIMARY KEY,
-    property_id INTEGER REFERENCES properties(id),
+    property_id INTEGER REFERENCES properties(property_id),
     room_type VARCHAR(50) NOT NULL,
     room_name VARCHAR(100),
     max_occupancy INTEGER DEFAULT 2,

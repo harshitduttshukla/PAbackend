@@ -55,8 +55,8 @@ import {ClientList,getProperty,checkRoomAvailability,saveReservation} from "./ap
 
 router.get("/clientRM",ClientList);
 router.get("/Property",getProperty);
-router.get("/checkRoomAvailability",checkRoomAvailability);
-router.post("/saveReservation",saveReservation);
+router.post("/checkRoomAvailability",checkRoomAvailability);
+router.post("/Reservation",saveReservation);
 
 
 
