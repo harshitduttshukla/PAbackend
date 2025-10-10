@@ -12,7 +12,9 @@ console.log("🔍 ENV:", process.env.DB_USERNAME, process.env.DB_NAME);
 const app = express();
 
 // ✅ Middlewares
-app.use(cors());
+// app.use(cors());
+app.use(cors({ origin: "*" }));
+
 app.use(bodyParser.json());
 
 app.use("/api", rout);
