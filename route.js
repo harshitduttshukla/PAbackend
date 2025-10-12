@@ -58,6 +58,10 @@ router.get("/Property",getProperty);
 router.post("/checkRoomAvailability",checkRoomAvailability);
 router.post("/Reservation",saveReservation);
 
+import {getAllReservations} from "./api/ReservationManagement/ReservationListPage.js"
+
+router.get("/getAllReservations",getAllReservations);
+
 
 
 export default router;
