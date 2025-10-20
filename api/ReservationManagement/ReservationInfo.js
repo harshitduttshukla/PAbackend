@@ -5,7 +5,7 @@ export async function ClientList(req, res) {
     const clientName = req.query.clientname;
 
     const query = `
-      SELECT * FROM clients WHERE client_name LIKE $1
+      SELECT * FROM clients WHERE client_name ILIKE $1
     `;
     const result = await pool.query(query, [`%${clientName}%`]);
 
