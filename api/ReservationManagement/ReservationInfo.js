@@ -26,16 +26,23 @@ export async function ClientList(req, res) {
 
 
 
+
+
+
 export async function getProperty(req, res) {
   try {
     const Address = req.query.Address;
 
     const query = `
-      SELECT * 
-      FROM properties 
-      WHERE address1 LIKE $1 
-         OR address2 LIKE $1 
-         OR address3 LIKE $1
+      SELECT p.* ,
+        h.host_name,
+        h.host_email,
+        h.host_contact_number
+      FROM properties p
+      LEFT JOIN host_information h ON p.host_id = h.host_id
+      WHERE p.address1 ILIKE $1 
+         OR p.address2 ILIKE $1 
+         OR p.address3 ILIKE $1
     `;
 
     const result = await pool.query(query, [`%${Address}%`]);
@@ -58,84 +65,6 @@ export async function getProperty(req, res) {
 
 
 // // checkAvailability.js
-// export async function checkRoomAvailability(req, res) {
-//     try {
-//         const { propertyId, checkInDate, checkOutDate, roomTypes } = req.body;
-
-//         if (!propertyId || !checkInDate || !checkOutDate || !roomTypes) {
-//             return res.status(400).json({
-//                 success: false,
-//                 message: "Missing required fields"
-//             });
-//         }
-
-//         // Check for overlapping bookings
-//         const conflictQuery = `
-//             SELECT 
-//                 rb.room_type,
-//                 r.reservation_no,
-//                 r.guest_name,
-//                 r.check_in_date,
-//                 r.check_out_date
-//             FROM room_bookings rb
-//             JOIN reservations r ON rb.reservation_id = r.id
-//             WHERE rb.property_id = $1
-//             AND rb.status = 'active'
-//             AND rb.room_type = ANY($2::text[])
-//             AND (
-//                 (rb.check_in_date <= $3 AND rb.check_out_date > $3) OR
-//                 (rb.check_in_date < $4 AND rb.check_out_date >= $4) OR
-//                 (rb.check_in_date >= $3 AND rb.check_out_date <= $4)
-//             )
-//         `;
-
-//         const conflicts = await pool.query(conflictQuery, [
-//             propertyId,
-//             roomTypes,
-//             checkInDate,
-//             checkOutDate
-//         ]);
-
-//         // Group conflicts by room type
-//         const conflictsByRoom = {};
-//         conflicts.rows.forEach(conflict => {
-//             if (!conflictsByRoom[conflict.room_type]) {
-//                 conflictsByRoom[conflict.room_type] = [];
-//             }
-//             conflictsByRoom[conflict.room_type].push({
-//                 id: conflict.reservation_no,
-//                 reservationNo: conflict.reservation_no,
-//                 guestName: conflict.guest_name,
-//                 checkIn: conflict.check_in_date,
-//                 checkOut: conflict.check_out_date,
-//                 roomType: conflict.room_type
-//             });
-//         });
-
-//         // Generate availability response
-//         const availability = roomTypes.map(roomType => ({
-//             roomType,
-//             isAvailable: !conflictsByRoom[roomType],
-//             conflictingReservations: conflictsByRoom[roomType] || []
-//         }));
-
-//         res.json({
-//             success: true,
-//             availability
-//         });
-
-//     } catch (error) {
-//         console.error('Error checking availability:', error);
-//         res.status(500).json({
-//             success: false,
-//             message: 'Internal server error'
-//         });
-//     }
-// }
-
-
-
-
 export async function checkRoomAvailability(req, res) {
   try {
     const { propertyId, checkInDate, checkOutDate, roomTypes } = req.body;
