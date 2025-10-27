@@ -137,168 +137,152 @@ export async function checkRoomAvailability(req, res) {
 
 
 
-function toInt(value, defaultValue = 0){
-    const n = parseInt(value,10);
-    return Number.isNaN(n)?defaultValue : n;
+
+// ✅ Utility functions
+function toInt(value, defaultValue = 0) {
+  const n = parseInt(value, 10);
+  return Number.isNaN(n) ? defaultValue : n;
 }
 
-function toFloat(value,defaultValue = 0){
-    const n = parseFloat(value);
-    return Number.isNaN(n)? defaultValue : n;
+function toFloat(value, defaultValue = 0) {
+  const n = parseFloat(value);
+  return Number.isNaN(n) ? defaultValue : n;
 }
 
-
-// saveReservation.js
+// ✅ Main API
 export async function saveReservation(req, res) {
-    const client = await pool.connect();
-    
-    try {
-        await client.query('BEGIN');
+  const client = await pool.connect();
 
-        const {
-            clientId,
-            propertyId,
-            guestInfo,
-            apartmentInfo,
-            pajasaInfo,
-            roomSelection,
-            createdAt
-        } = req.body;
+  try {
+    await client.query("BEGIN");
 
-        // Generate reservation number
-        const reservationNo = `RES${Date.now()}`;
+    const {
+      clientId,
+      propertyId,
+      guestInfo,
+      apartmentInfo,
+      pajasaInfo,
+      roomSelection,
+      createdAt,
+    } = req.body;
 
-          const reservationValues = [
-            reservationNo,
-            clientId,
-            propertyId,
-            guestInfo.guestName || '',
-            guestInfo.guestEmail || '',
-            guestInfo.contactNumber || '',
-            guestInfo.cid || null, // check-in date
-            apartmentInfo.checkOutDate || null, // check-out date
-            guestInfo.checkInTime || '',
-            guestInfo.checkOutTime || '',
-            toInt(guestInfo.occupancy),
-            toFloat(guestInfo.baseRate),
-            toFloat(guestInfo.taxes),
-            toFloat(guestInfo.totalTariff),
-            guestInfo.paymentMode || '',
-            guestInfo.tariffType || '',
-            toInt(guestInfo.chargeableDays),
-            guestInfo.adminEmail || '',
-            createdAt || new Date()
-        ];
+    // 🧾 Generate a unique reservation number
+    const reservationNo = `RES${Date.now()}`;
 
-        // Insert main reservation
-        const reservationQuery = `
-            INSERT INTO reservations (
-                reservation_no, client_id, property_id, guest_name, guest_email,
-                contact_number, check_in_date, check_out_date, check_in_time,
-                check_out_time, occupancy, base_rate, taxes, total_tariff,
-                payment_mode, tariff_type, chargeable_days, admin_email, created_at
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
-            RETURNING id
-        `;
+    console.log("guestInfo received:", guestInfo);
 
-       
-        
+    // ✅ Ensure date fields come from guestInfo (not apartmentInfo)
+    const checkInDate =
+      guestInfo.checkInDate && guestInfo.checkInDate !== ""
+        ? guestInfo.checkInDate
+        : null;
+    const checkOutDate =
+      guestInfo.checkOutDate && guestInfo.checkOutDate !== ""
+        ? guestInfo.checkOutDate
+        : null;
 
-        const reservationResult = await client.query(reservationQuery,reservationValues);
+    // ✅ Prepare values for main reservation insert
+    const reservationValues = [
+      reservationNo,
+      clientId,
+      propertyId,
+      guestInfo.guestName || "",
+      guestInfo.guestEmail || "",
+      guestInfo.contactNumber || "",
+      checkInDate, // ✅ correct source
+      checkOutDate, // ✅ correct source
+      guestInfo.checkInTime || "",
+      guestInfo.checkOutTime || "",
+      toInt(guestInfo.occupancy),
+      toFloat(guestInfo.baseRate),
+      toFloat(guestInfo.taxes),
+      toFloat(guestInfo.totalTariff),
+      guestInfo.paymentMode || "",
+      guestInfo.tariffType || "",
+      toInt(guestInfo.chargeableDays),
+      guestInfo.adminEmail || "",
+      createdAt || new Date(),
+    ];
 
-        const reservationId = reservationResult.rows[0].id;
+    const reservationQuery = `
+      INSERT INTO reservations (
+        reservation_no, client_id, property_id, guest_name, guest_email,
+        contact_number, check_in_date, check_out_date, check_in_time,
+        check_out_time, occupancy, base_rate, taxes, total_tariff,
+        payment_mode, tariff_type, chargeable_days, admin_email, created_at
+      )
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+      RETURNING id
+    `;
 
-        // Insert room bookings
-        const roomBookingQuery = `
-            INSERT INTO room_bookings (
-                reservation_id, room_type, property_id, check_in_date, check_out_date
-            ) VALUES ($1, $2, $3, $4, $5)
-        `;
+    const reservationResult = await client.query(
+      reservationQuery,
+      reservationValues
+    );
 
-        for (const roomType of roomSelection) {
-            await client.query(roomBookingQuery, [
-                reservationId,
-                roomType,
-                propertyId,
-                guestInfo.cid || null,
-                apartmentInfo.checkOutDate || null
-            ]);
-        }
+    const reservationId = reservationResult.rows[0].id;
 
-        // Save additional info (apartment and pajasa info)
-        const additionalInfoQuery = `
-            INSERT INTO reservation_additional_info (
-                reservation_id, host_name, host_email, host_base_rate,
-                host_taxes, host_total_amount, contact_person, contact_number,
-                comments, services, note
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        `;
+    // ✅ Insert room bookings
+    const roomBookingQuery = `
+      INSERT INTO room_bookings (
+        reservation_id, room_type, property_id, check_in_date, check_out_date
+      ) VALUES ($1, $2, $3, $4, $5)
+    `;
 
-        await client.query(additionalInfoQuery,  [
-            reservationId,
-            apartmentInfo.hostName || '',
-            apartmentInfo.hostEmail || '',
-            toFloat(apartmentInfo.hostBaseRate),
-            toFloat(apartmentInfo.hostTaxes),
-            toFloat(apartmentInfo.hostTotalAmount),
-            apartmentInfo.contactPerson || '',
-            apartmentInfo.contactNumber || '',
-            pajasaInfo.comments || '',
-            JSON.stringify(pajasaInfo.services || []),
-            pajasaInfo.note || ''
-        ]);
-
-        await client.query('COMMIT');
-
-        res.json({
-            success: true,
-            message: 'Reservation saved successfully',
-            reservationNo,
-            reservationId
-        });
-
-    } catch (error) {
-        await client.query('ROLLBACK');
-        console.error('Error saving reservation:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Error saving reservation'
-        });
-    } finally {
-        client.release();
+    for (const roomType of roomSelection) {
+      await client.query(roomBookingQuery, [
+        reservationId,
+        roomType,
+        propertyId,
+        checkInDate, // ✅ fixed
+        checkOutDate, // ✅ fixed
+      ]);
     }
+
+    // ✅ Insert additional reservation info
+    const additionalInfoQuery = `
+      INSERT INTO reservation_additional_info (
+        reservation_id, host_name, host_email, host_base_rate,
+        host_taxes, host_total_amount, contact_person, contact_number,
+        comments, services, note
+      ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+    `;
+
+    await client.query(additionalInfoQuery, [
+      reservationId,
+      apartmentInfo.hostName || "",
+      apartmentInfo.hostEmail || "",
+      toFloat(apartmentInfo.hostBaseRate),
+      toFloat(apartmentInfo.hostTaxes),
+      toFloat(apartmentInfo.hostTotalAmount),
+      apartmentInfo.contactPerson || "",
+      apartmentInfo.contactNumber || "",
+      pajasaInfo.comments || "",
+      JSON.stringify(pajasaInfo.services || []),
+      pajasaInfo.note || "",
+    ]);
+
+    await client.query("COMMIT");
+
+    // ✅ Response
+    res.json({
+      success: true,
+      message: "Reservation saved successfully",
+      reservationNo,
+      reservationId,
+    });
+  } catch (error) {
+    await client.query("ROLLBACK");
+    console.error("Error saving reservation:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error saving reservation",
+      error: error.message,
+    });
+  } finally {
+    client.release();
+  }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
