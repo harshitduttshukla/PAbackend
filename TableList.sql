@@ -1,5 +1,3 @@
-
-
 CREATE TABLE host_information (
     host_id SERIAL PRIMARY KEY, -- Unique ID for each host (auto-increment)
     host_name VARCHAR(100) NOT NULL, -- Name of the host
