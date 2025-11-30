@@ -2,7 +2,6 @@ import pool from "../../client.js";
 
 export const getAllReservations = async (req, res) => {
   try {
-  
     const query = `
       SELECT 
         r.*,
@@ -27,3 +26,55 @@ export const getAllReservations = async (req, res) => {
     res.status(500).json({ error: 'Internal server error' });
   }
 };
+
+
+export async function deleteReservation(req, res) {
+  try {
+    await pool.query("BEGIN"); // ✅ Start transaction
+
+    const reservationId = parseInt(req.query.id);
+    console.log(req.query.id);
+    
+
+    if (isNaN(reservationId)) {
+      return res.status(400).json({
+        error: "Invalid reservation ID",
+      });
+    }
+
+    // ✅ Check if reservation exists
+    const existsQuery = `SELECT * FROM reservations WHERE id = $1`;
+    const existsResult = await pool.query(existsQuery, [reservationId]);
+
+    if (existsResult.rows.length === 0) {
+      return res.status(404).json({
+        error: "Reservation not found",
+      });
+    }
+
+    // ✅ Delete dependent rows first
+    const deleteRoomBookingsQuery = `DELETE FROM room_bookings WHERE reservation_id = $1`;
+    await pool.query(deleteRoomBookingsQuery, [reservationId]);
+
+    const deleteAdditionalInfoQuery = `DELETE FROM reservation_additional_info WHERE reservation_id = $1`;
+    await pool.query(deleteAdditionalInfoQuery, [reservationId]);
+
+    // ✅ Delete from main reservations table
+    const deleteReservationQuery = `DELETE FROM reservations WHERE id = $1`;
+    await pool.query(deleteReservationQuery, [reservationId]);
+
+    await pool.query("COMMIT"); // ✅ Commit transaction
+
+    return res.status(200).json({
+      success: true,
+      message: `Reservation ID ${reservationId} deleted successfully`,
+    });
+
+  } catch (error) {
+    await pool.query("ROLLBACK"); // ✅ Rollback on error
+    console.error("Error deleting reservation:", error);
+    res.status(500).json({
+      error: "Internal server error while deleting reservation",
+    });
+  }
+}

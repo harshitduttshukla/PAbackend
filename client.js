@@ -1,37 +1,24 @@
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 import pkg from "pg";
 const { Pool } = pkg;
 import dotenv from "dotenv";
 dotenv.config();
 
 const pool = new Pool({
-  // connectionString: `postgresql://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@localhost:5432/${process.env.DB_NAME}`,
+  connectionString: `postgresql://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@localhost:5432/${process.env.DB_NAME}`,
   // Remote with SSL support:
   // connectionString: `postgresql://${process.env.DB_USERNAME}:${process.env.DB_PASSWORD}@13.61.236.213:5432/${process.env.DB_NAME}?sslmode=require`,
   
   // Alternative: Configure SSL separately
-  host: '13.61.236.213',
-  port: 5432,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USERNAME,
-  password: process.env.DB_PASSWORD,
-  ssl: {
-    rejectUnauthorized: false
-  }
+  // host: '13.61.236.213',
+  // port: 5432,
+  // database: process.env.DB_NAME,
+  // user: process.env.DB_USERNAME,
+  // password: process.env.DB_PASSWORD,
+  // ssl: {
+  //   rejectUnauthorized: false
+  // }
 });
 
 // Helper function

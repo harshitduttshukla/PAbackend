@@ -58,9 +58,14 @@ router.get("/Property",getProperty);
 router.post("/checkRoomAvailability",checkRoomAvailability);
 router.post("/Reservation",saveReservation);
 
-import {getAllReservations} from "./api/ReservationManagement/ReservationListPage.js"
+
+// Reservation List
+import {getAllReservations,deleteReservation} from "./api/ReservationManagement/ReservationListPage.js"
+import { sendEmail } from "./api/email/resend.js";
 
 router.get("/getAllReservations",getAllReservations);
+router.delete("/deleteReservation",deleteReservation)
+router.post("/sendemail", sendEmail);
 
 
 

@@ -1,14 +1,6 @@
 import pool from "../../client.js";
 
-// export async function getPropertyByid(prop_id){
 
-//     try {
-        
-//         const existsQuery = 'SELECT * FROM properties WHERE property_id = $1'
-//     } catch (error) {
-        
-//     }
-// }
 
 
 
