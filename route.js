@@ -67,6 +67,10 @@ router.get("/getAllReservations",getAllReservations);
 router.delete("/deleteReservation",deleteReservation)
 router.post("/sendemail", sendEmail);
 
+import {createInvoice} from "./api/invioce/invioceform.js"
+
+router.post("/createInvoice",createInvoice)
+
 
 
 export default router;
