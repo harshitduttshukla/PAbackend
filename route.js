@@ -1,6 +1,6 @@
 import express from "express";
 import createHost from "./api/Hostapi/HostInfo.js";
-import {getAllHosts,deleteHost, updateHost} from "./api/Hostapi/hostListPage.js"
+import { getAllHosts, deleteHost, updateHost } from "./api/Hostapi/hostListPage.js"
 
 const router = express.Router();
 
@@ -13,63 +13,65 @@ router.put("/updateHost/:id", updateHost);
 
 
 // property
-import { getPinCode,getHost,createProperty } from "./api/Property/propertyinfo.js"
+import { getPinCode, getHost, createProperty } from "./api/Property/propertyinfo.js"
 import { Pincode } from "./api/Pincode/Pincodeinfo.js";
-import {AllPinCode} from "./api/Pincode/PincodeListPage.js"
+import { AllPinCode } from "./api/Pincode/PincodeListPage.js"
 
 
 // pincode 
-router.post("/Pincode",Pincode)
-router.get("/AllPinCode",AllPinCode)
+router.post("/Pincode", Pincode)
+router.get("/AllPinCode", AllPinCode)
 
 
 
 
 
-router.get("/PinCode",getPinCode);
-router.get("/host",getHost);
+router.get("/PinCode", getPinCode);
+router.get("/host", getHost);
 
 router.post("/properties", createProperty);
 
-import { getallProperty,deleteProperty} from "./api/Property/propertyListPage.js";
+import { getallProperty, deleteProperty } from "./api/Property/propertyListPage.js";
 
-router.get("/properties",getallProperty);
+router.get("/properties", getallProperty);
 
-router.delete("/deleteProperty/:id",deleteProperty)
+router.delete("/deleteProperty/:id", deleteProperty)
 
 
 // client
-import {insertClient} from "./api/Client/Clientinfo.js"
-import {ClientListPage,deleteClient,updateClient} from "./api/Client/ClientListPage.js"
+import { insertClient } from "./api/Client/Clientinfo.js"
+import { ClientListPage, deleteClient, updateClient } from "./api/Client/ClientListPage.js"
 
 
 router.post("/insertClient", insertClient);
 
-router.get("/clients",ClientListPage);
-router.delete("/deleteClient/:id",deleteClient);
-router.put("/updateClient/:id",updateClient);
+router.get("/clients", ClientListPage);
+router.delete("/deleteClient/:id", deleteClient);
+router.put("/updateClient/:id", updateClient);
 
 
 // Reservation
-import {ClientList,getProperty,checkRoomAvailability,saveReservation} from "./api/ReservationManagement/ReservationInfo.js"
+import { ClientList, getProperty, checkRoomAvailability, saveReservation } from "./api/ReservationManagement/ReservationInfo.js"
 
-router.get("/clientRM",ClientList);
-router.get("/Property",getProperty);
-router.post("/checkRoomAvailability",checkRoomAvailability);
-router.post("/Reservation",saveReservation);
+router.get("/clientRM", ClientList);
+router.get("/Property", getProperty);
+router.post("/checkRoomAvailability", checkRoomAvailability);
+router.post("/Reservation", saveReservation);
 
 
 // Reservation List
-import {getAllReservations,deleteReservation} from "./api/ReservationManagement/ReservationListPage.js"
+import { getAllReservations, deleteReservation } from "./api/ReservationManagement/ReservationListPage.js"
 import { sendEmail } from "./api/email/resend.js";
 
-router.get("/getAllReservations",getAllReservations);
-router.delete("/deleteReservation",deleteReservation)
+router.get("/getAllReservations", getAllReservations);
+router.delete("/deleteReservation", deleteReservation)
 router.post("/sendemail", sendEmail);
 
-import {createInvoice} from "./api/invioce/invioceform.js"
+import { createInvoice } from "./api/invioce/invioceform.js"
+import { getAllInvoices } from "./api/invioce/invoiceListPage.js"
 
-router.post("/createInvoice",createInvoice)
+router.post("/createInvoice", createInvoice)
+router.get("/getAllInvoices", getAllInvoices)
 
 
 
