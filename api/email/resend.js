@@ -417,8 +417,8 @@ export async function sendEmail(req, res) {
 
     // ✅ Send the email
     const { data, error } = await resend.emails.send({
-      from: "OBDSmart <onboarding@resend.dev>", // Replace later with verified domain
-      to: ['harshitshukla6388@gmail.com'],
+      from: "hosting@pajasa.com", // Replace later with verified domain
+      to: [apartmentemail],
       subject,
       html,
     });
