@@ -31,9 +31,11 @@ router.get("/host", getHost);
 
 router.post("/properties", createProperty);
 
-import { getallProperty, deleteProperty } from "./api/Property/propertyListPage.js";
+import { getallProperty, deleteProperty, getPropertyById, UpdateProperty } from "./api/Property/propertyListPage.js";
 
 router.get("/properties", getallProperty);
+router.get("/property/:id", getPropertyById);
+router.put("/updateProperty/:id", UpdateProperty);
 
 router.delete("/deleteProperty/:id", deleteProperty)
 
@@ -48,15 +50,19 @@ router.post("/insertClient", insertClient);
 router.get("/clients", ClientListPage);
 router.delete("/deleteClient/:id", deleteClient);
 router.put("/updateClient/:id", updateClient);
+import { getClientById } from "./api/Client/ClientListPage.js";
+router.get("/client/:id", getClientById);
 
 
 // Reservation
-import { ClientList, getProperty, checkRoomAvailability, saveReservation } from "./api/ReservationManagement/ReservationInfo.js"
+import { ClientList, getProperty, checkRoomAvailability, saveReservation, getReservationById, updateReservation } from "./api/ReservationManagement/ReservationInfo.js"
 
 router.get("/clientRM", ClientList);
 router.get("/Property", getProperty);
 router.post("/checkRoomAvailability", checkRoomAvailability);
 router.post("/Reservation", saveReservation);
+router.get("/getReservationById", getReservationById);
+router.put("/updateReservation", updateReservation);
 
 
 // Reservation List
