@@ -139,7 +139,7 @@ export async function checkRoomAvailability(req, res) {
 
 
 
-// ✅ Utility functions
+// Utility functions
 function toInt(value, defaultValue = 0) {
   const n = parseInt(value, 10);
   return Number.isNaN(n) ? defaultValue : n;
@@ -150,7 +150,6 @@ function toFloat(value, defaultValue = 0) {
   return Number.isNaN(n) ? defaultValue : n;
 }
 
-// ✅ Main API
 export async function saveReservation(req, res) {
   const client = await pool.connect();
 
@@ -167,22 +166,26 @@ export async function saveReservation(req, res) {
       createdAt,
     } = req.body;
 
-    // 🧾 Generate a unique reservation number
+    // Generate reservation number
     const reservationNo = `RES${Date.now()}`;
 
     console.log("guestInfo received:", guestInfo);
 
-    // ✅ Ensure date fields come from guestInfo (not apartmentInfo)
-    const checkInDate =
-      guestInfo.checkInDate && guestInfo.checkInDate !== ""
-        ? guestInfo.checkInDate
-        : null;
-    const checkOutDate =
-      guestInfo.checkOutDate && guestInfo.checkOutDate !== ""
-        ? guestInfo.checkOutDate
-        : null;
+    // Extract dates
+    const checkInDate = guestInfo?.checkInDate || null;
+    const checkOutDate = guestInfo?.checkOutDate || null;
 
-    // ✅ Prepare values for main reservation insert
+    // Validation
+    if (!checkInDate) {
+      throw new Error("checkInDate is required");
+    }
+    if (!checkOutDate) {
+      throw new Error("checkOutDate is required");
+    }
+
+    /**
+     * INSERT INTO reservations
+     */
     const reservationValues = [
       reservationNo,
       clientId,
@@ -190,8 +193,8 @@ export async function saveReservation(req, res) {
       guestInfo.guestName || "",
       guestInfo.guestEmail || "",
       guestInfo.contactNumber || "",
-      checkInDate, // ✅ correct source
-      checkOutDate, // ✅ correct source
+      checkInDate,
+      checkOutDate,
       guestInfo.checkInTime || "",
       guestInfo.checkOutTime || "",
       toInt(guestInfo.occupancy),
@@ -216,33 +219,46 @@ export async function saveReservation(req, res) {
       RETURNING id
     `;
 
-    const reservationResult = await client.query(
-      reservationQuery,
-      reservationValues
-    );
-
+    const reservationResult = await client.query(reservationQuery, reservationValues);
     const reservationId = reservationResult.rows[0].id;
 
-    // ✅ Insert room bookings
-    const roomBookingQuery = `
-      INSERT INTO room_bookings (reservation_id, room_type)
-      VALUES ($1, $2)
-    `;
 
-    if (roomSelection && roomSelection.length > 0) {
-      for (const room of roomSelection) {
-        await client.query(roomBookingQuery, [reservationId, room]);
-      }
-    }
 
-    // ✅ Insert additional reservation info
+    // Corrected room booking insertion
+const roomBookingQuery = `
+  INSERT INTO room_bookings (
+    reservation_id,
+    room_type,
+    check_in_date,
+    check_out_date,
+    status
+  )
+  VALUES ($1,$2,$3,$4,$5)
+`;
+
+if (roomSelection && roomSelection.length > 0) {
+  for (const room of roomSelection) {
+    await client.query(roomBookingQuery, [
+      reservationId,
+      room,
+      checkInDate,
+      checkOutDate,
+      "active",
+    ]);
+  }
+}
+
+
+    /**
+     * INSERT ADDITIONAL INFO
+     */
     const additionalInfoQuery = `
       INSERT INTO reservation_additional_info(
       reservation_id, host_name, host_email, host_base_rate,
       host_taxes, host_total_amount, contact_person, contact_number,
       comments, services, note
-    ) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-      `;
+      ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+    `;
 
     await client.query(additionalInfoQuery, [
       reservationId,
@@ -260,17 +276,17 @@ export async function saveReservation(req, res) {
 
     await client.query("COMMIT");
 
-    // ✅ Response
-    res.json({
+    return res.json({
       success: true,
       message: "Reservation saved successfully",
       reservationNo,
       reservationId,
     });
+
   } catch (error) {
     await client.query("ROLLBACK");
     console.error("Error saving reservation:", error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Error saving reservation",
       error: error.message,
@@ -279,6 +295,7 @@ export async function saveReservation(req, res) {
     client.release();
   }
 }
+
 
 
 export async function getReservationById(req, res) {

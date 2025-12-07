@@ -4,19 +4,22 @@ export async function insertClient(req, res) {
   try {
     const {
       active,
-      clientName,
-      gstNo,
-      streetAddress,
-      streetAddress2,
+      client_name,
+      gst_no,
+      street_address,
+      street_address_2,
       city,
       state,
-      zipCode,
-      phoneNumber,
-      faxNumber,
-      mobileNumber,
-      emailAddress,
-      webAddress,
+      zip_code,
+      phone_number,
+      fax_number,
+      mobile_number,
+      email_address,
+      web_address,
     } = req.body;
+
+    console.log(req.body);
+
 
     const query = `
       INSERT INTO clients (
@@ -34,18 +37,18 @@ export async function insertClient(req, res) {
 
     const values = [
       active ?? true,
-      clientName,
-      gstNo,
-      streetAddress,
-      streetAddress2,
+      client_name,
+      gst_no,
+      street_address,
+      street_address_2,
       city,
       state,
-      zipCode,
-      phoneNumber,
-      faxNumber,
-      mobileNumber,
-      emailAddress,
-      webAddress,
+      zip_code,
+      phone_number,
+      fax_number,
+      mobile_number,
+      email_address,
+      web_address,
     ];
 
     const result = await pool.query(query, values);
