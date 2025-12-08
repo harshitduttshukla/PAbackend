@@ -63,7 +63,7 @@ router.get("/client/:id", getClientById);
 
 
 // Reservation
-import { ClientList, getProperty, checkRoomAvailability, saveReservation, getReservationById, updateReservation } from "./api/ReservationManagement/ReservationInfo.js"
+import { ClientList, getProperty, checkRoomAvailability, saveReservation, getReservationById, updateReservation, getReservationHistory } from "./api/ReservationManagement/ReservationInfo.js"
 
 router.get("/clientRM", ClientList);
 router.get("/Property", getProperty);
@@ -80,6 +80,7 @@ import { sendEmail } from "./api/email/resend.js";
 router.get("/getAllReservations", getAllReservations);
 router.delete("/deleteReservation", deleteReservation)
 router.post("/sendemail", sendEmail);
+router.get("/getReservationHistory", getReservationHistory);
 
 import { createInvoice } from "./api/invioce/invioceform.js"
 import { getAllInvoices } from "./api/invioce/invoiceListPage.js"

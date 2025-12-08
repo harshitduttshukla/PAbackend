@@ -67,7 +67,7 @@ export async function getProperty(req, res) {
 // // checkAvailability.js
 export async function checkRoomAvailability(req, res) {
   try {
-    const { propertyId, checkInDate, checkOutDate, roomTypes } = req.body;
+    const { propertyId, checkInDate, checkOutDate, roomTypes, excludeReservationId } = req.body;
 
     if (!propertyId || !checkInDate || !checkOutDate || !roomTypes) {
       return res.status(400).json({
@@ -76,7 +76,7 @@ export async function checkRoomAvailability(req, res) {
       });
     }
 
-    const conflictQuery = `
+    let conflictQuery = `
     SELECT DISTINCT
         rb.room_type,
         r.reservation_no,
@@ -92,13 +92,20 @@ export async function checkRoomAvailability(req, res) {
         AND rb.check_out_date >= $3
     `;
 
-
-    const conflicts = await pool.query(conflictQuery, [
+    const queryParams = [
       propertyId,
       roomTypes,
       checkInDate,
       checkOutDate,
-    ]);
+    ];
+
+    if (excludeReservationId) {
+      conflictQuery += ` AND r.id != $5`;
+      queryParams.push(excludeReservationId);
+    }
+
+
+    const conflicts = await pool.query(conflictQuery, queryParams);
 
     const conflictsByRoom = {};
     conflicts.rows.forEach(conflict => {
@@ -167,7 +174,16 @@ export async function saveReservation(req, res) {
     } = req.body;
 
     // Generate reservation number
-    const reservationNo = `RES${Date.now()}`;
+    // Format: PAR-YY-MM-000001
+    const dateObj = new Date();
+    const yy = String(dateObj.getFullYear()).slice(-2);
+    const mm = String(dateObj.getMonth() + 1).padStart(2, "0");
+
+    // Check for the latest reservation number to increment
+    const countQuery = `SELECT count(*) FROM reservations WHERE reservation_no LIKE $1`;
+    const countResult = await client.query(countQuery, [`PAR-${yy}-${mm}-%`]);
+    const nextNum = parseInt(countResult.rows[0].count, 10) + 1;
+    const reservationNo = `PAR-${yy}-${mm}-${String(nextNum).padStart(6, "0")}`;
 
     console.log("guestInfo received:", guestInfo);
 
@@ -225,7 +241,7 @@ export async function saveReservation(req, res) {
 
 
     // Corrected room booking insertion
-const roomBookingQuery = `
+    const roomBookingQuery = `
   INSERT INTO room_bookings (
     reservation_id,
     room_type,
@@ -236,17 +252,17 @@ const roomBookingQuery = `
   VALUES ($1,$2,$3,$4,$5)
 `;
 
-if (roomSelection && roomSelection.length > 0) {
-  for (const room of roomSelection) {
-    await client.query(roomBookingQuery, [
-      reservationId,
-      room,
-      checkInDate,
-      checkOutDate,
-      "active",
-    ]);
-  }
-}
+    if (roomSelection && roomSelection.length > 0) {
+      for (const room of roomSelection) {
+        await client.query(roomBookingQuery, [
+          reservationId,
+          room,
+          checkInDate,
+          checkOutDate,
+          "active",
+        ]);
+      }
+    }
 
 
     /**
@@ -274,6 +290,30 @@ if (roomSelection && roomSelection.length > 0) {
       pajasaInfo.note || "",
     ]);
 
+    /**
+     * INSERT ADDITIONAL GUESTS
+     */
+    if (guestInfo.additionalGuests && guestInfo.additionalGuests.length > 0) {
+      const additionalGuestsQuery = `
+          INSERT INTO reservation_additional_guests(
+            reservation_id, guest_name, cid, cod, room_type, occupancy, address, email, contact_number
+          ) VALUES ${guestInfo.additionalGuests.map((_, i) => `($1, $${i * 8 + 2}, $${i * 8 + 3}, $${i * 8 + 4}, $${i * 8 + 5}, $${i * 8 + 6}, $${i * 8 + 7}, $${i * 8 + 8}, $${i * 8 + 9})`).join(", ")}
+        `;
+
+      const additionalGuestsValues = [reservationId, ...guestInfo.additionalGuests.flatMap(guest => [
+        guest.guestName || null,
+        guest.cid || null,
+        guest.cod || null,
+        guest.roomType || null,
+        guest.occupancy || null,
+        guest.address || null,
+        guest.email || null,
+        guest.contactNumber || null
+      ])];
+
+      await client.query(additionalGuestsQuery, additionalGuestsValues);
+    }
+
     await client.query("COMMIT");
 
     return res.json({
@@ -298,18 +338,9 @@ if (roomSelection && roomSelection.length > 0) {
 
 
 
-export async function getReservationById(req, res) {
-  try {
-    const { id } = req.query;
-
-    if (!id) {
-      return res.status(400).json({
-        success: false,
-        message: "Reservation ID is required",
-      });
-    }
-
-    const query = `
+// Helper to fetch full reservation data
+async function fetchReservationData(id) {
+  const query = `
     SELECT
     r.*,
       c.client_name,
@@ -330,7 +361,9 @@ export async function getReservationById(req, res) {
           'cod', rag.cod,
           'roomType', rag.room_type,
           'occupancy', rag.occupancy,
-          'address', rag.address
+          'address', rag.address,
+          'email', rag.email,
+          'contactNumber', rag.contact_number
         ))
           FROM reservation_additional_guests rag
           WHERE rag.reservation_id = r.id
@@ -342,41 +375,49 @@ export async function getReservationById(req, res) {
       WHERE r.id = $1
       `;
 
-    const result = await pool.query(query, [id]);
+  const result = await pool.query(query, [id]);
+  if (result.rows.length === 0) return null;
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "Reservation not found",
-      });
-    }
+  const data = result.rows[0];
+  if (typeof data.services === 'string') {
+    try { data.services = JSON.parse(data.services); } catch (e) { data.services = {}; }
+  }
+  return data;
+}
 
-    const data = result.rows[0];
+export async function getReservationById(req, res) {
+  try {
+    const { id } = req.query;
+    if (!id) return res.status(400).json({ success: false, message: "Reservation ID is required" });
 
-    // Parse services if it's a string
-    if (typeof data.services === 'string') {
-      try {
-        data.services = JSON.parse(data.services);
-      } catch (e) {
-        data.services = {};
-      }
-    }
+    const data = await fetchReservationData(id);
 
-    // Map DB fields to frontend expected format if needed
-    // For now, sending as is, frontend will map it
+    if (!data) return res.status(404).json({ success: false, message: "Reservation not found" });
 
-    res.json({
-      success: true,
-      data: data,
-    });
+    res.json({ success: true, data });
 
   } catch (error) {
     console.error("Error fetching reservation:", error);
-    res.status(500).json({
-      success: false,
-      message: "Error fetching reservation details",
-      error: error.message,
-    });
+    res.status(500).json({ success: false, message: "Error fetching reservation details", error: error.message });
+  }
+}
+
+export async function getReservationHistory(req, res) {
+  try {
+    const { id } = req.query;
+    if (!id) return res.status(400).json({ success: false, message: "Reservation ID is required" });
+
+    const query = `
+      SELECT * FROM reservation_versions 
+      WHERE reservation_id = $1 
+      ORDER BY change_date DESC
+    `;
+    const result = await pool.query(query, [id]);
+
+    res.json({ success: true, data: result.rows });
+  } catch (error) {
+    console.error("Error fetching history:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
   }
 }
 
@@ -399,6 +440,43 @@ export async function updateReservation(req, res) {
 
     if (!id) {
       throw new Error("Reservation ID is required for update");
+    }
+
+    // 0. Save Snapshot (History)
+    // We need to fetch the *current* state before updating.
+    // Ideally use a separate client or just query within transaction.
+    // Note: fetchReservationData creates a new query, we should probably run the query part manually here
+    // or just assume we can fetch it. To be safe within transaction, we should query using `client`.
+
+    // FETCH OLD DATA FOR HISTORY
+    const oldDataQuery = `
+    SELECT
+    r.*,
+      c.client_name,
+      p.address1, p.city, p.location, p.property_type,
+      rai.host_name, rai.host_email, rai.host_base_rate, rai.host_taxes,
+      rai.host_total_amount, rai.contact_person, rai.contact_number as contact_person_number,
+      rai.comments, rai.services, rai.note,
+      (SELECT json_agg(room_type) FROM room_bookings rb WHERE rb.reservation_id = r.id) as "roomSelection",
+      (SELECT json_agg(json_build_object(
+          'id', rag.id, 'guestName', rag.guest_name, 'cid', rag.cid, 'cod', rag.cod, 
+          'roomType', rag.room_type, 'occupancy', rag.occupancy, 'address', rag.address,
+          'email', rag.email, 'contactNumber', rag.contact_number
+        )) FROM reservation_additional_guests rag WHERE rag.reservation_id = r.id) as "additionalGuests"
+      FROM reservations r
+      LEFT JOIN clients c ON r.client_id = c.id
+      LEFT JOIN properties p ON r.property_id = p.property_id
+      LEFT JOIN reservation_additional_info rai ON r.id = rai.reservation_id
+      WHERE r.id = $1
+    `;
+    const oldResult = await client.query(oldDataQuery, [id]);
+
+    if (oldResult.rows.length > 0) {
+      const oldData = oldResult.rows[0];
+      await client.query(
+        "INSERT INTO reservation_versions (reservation_id, snapshot_data) VALUES ($1, $2)",
+        [id, JSON.stringify(oldData)]
+      );
     }
 
     // ✅ Ensure date fields come from guestInfo
@@ -526,8 +604,8 @@ export async function updateReservation(req, res) {
     if (additionalGuests && additionalGuests.length > 0) {
       const additionalGuestsQuery = `
         INSERT INTO reservation_additional_guests(
-          reservation_id, guest_name, cid, cod, room_type, occupancy, address
-        ) VALUES ${additionalGuests.map((_, i) => `($1, $${i * 6 + 2}, $${i * 6 + 3}, $${i * 6 + 4}, $${i * 6 + 5}, $${i * 6 + 6}, $${i * 6 + 7})`).join(", ")}
+          reservation_id, guest_name, cid, cod, room_type, occupancy, address, email, contact_number
+        ) VALUES ${additionalGuests.map((_, i) => `($1, $${i * 8 + 2}, $${i * 8 + 3}, $${i * 8 + 4}, $${i * 8 + 5}, $${i * 8 + 6}, $${i * 8 + 7}, $${i * 8 + 8}, $${i * 8 + 9})`).join(", ")}
     `;
 
       const additionalGuestsValues = [id, ...additionalGuests.flatMap(guest => [
@@ -536,7 +614,9 @@ export async function updateReservation(req, res) {
         guest.cod || null,
         guest.roomType || null,
         guest.occupancy || null,
-        guest.address || null
+        guest.address || null,
+        guest.email || null,
+        guest.contactNumber || null
       ])];
 
       await client.query(additionalGuestsQuery, additionalGuestsValues);

@@ -3,37 +3,37 @@ import { Resend } from "resend";
 const resend = new Resend(process.env.RESEND_API_KEY); // ✅ Load from .env
 
 export async function sendEmail(req, res) {
-  try {
-    
+    try {
 
-    const {
-      apartmentemail,
-      subject,
-      apartmentname,
-      contactperson,
-      contactnumber,
-      guestname,
-      contactnumberguest,
-      checkin,
-      checkout,
-      chargeabledays,
-      amount,
-      modeofpayment,
-      guesttype,
-      roomtype,
-      occupancy,
-      inclusions
-    } = req.body;
 
-    // ✅ Validate input
-    if (!apartmentemail || !subject) {
-      return res.status(400).json({
-        error: "Missing required fields: 'apartmentemail' or 'subject'",
-      });
-    }
+        const {
+            apartmentemail,
+            subject,
+            apartmentname,
+            contactperson,
+            contactnumber,
+            guestname,
+            contactnumberguest,
+            checkin,
+            checkout,
+            chargeabledays,
+            amount,
+            modeofpayment,
+            guesttype,
+            roomtype,
+            inclusions,
+            reservationNo
+        } = req.body;
 
-    // ✅ Your full HTML template
-    const html = `
+        // ✅ Validate input
+        if (!apartmentemail || !subject) {
+            return res.status(400).json({
+                error: "Missing required fields: 'apartmentemail' or 'subject'",
+            });
+        }
+
+        // ✅ Your full HTML template
+        const html = `
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -59,233 +59,6 @@ export async function sendEmail(req, res) {
             background-color: white;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
         }
-
-        .header {
-            text-align: right;
-            padding: 20px 30px;
-            border-bottom: 2px solid #e0e0e0;
-            font-size: 13px;
-            color: #666;
-        }
-
-        .header-info {
-            margin-bottom: 5px;
-        }
-
-        .header-info strong {
-            color: #333;
-        }
-
-        .reservation-no {
-            color: #ff9800;
-            font-weight: bold;
-        }
-
-        .main-title {
-            padding: 30px 30px 20px;
-            font-size: 32px;
-            font-weight: bold;
-            color: #333;
-        }
-
-        .company-name {
-            padding: 0 30px 10px;
-            font-size: 16px;
-            color: #666;
-        }
-
-        .thank-you {
-            padding: 0 30px 20px;
-            font-size: 14px;
-            color: #333;
-            font-weight: bold;
-        }
-
-        .intro-text {
-            padding: 0 30px 20px;
-            font-size: 14px;
-            color: #666;
-            line-height: 1.6;
-        }
-
-        .section-title {
-            padding: 20px 30px 15px;
-            font-size: 16px;
-            font-weight: bold;
-            color: #ff9800;
-        }
-
-        .apartment-section {
-            padding: 0 30px 20px;
-        }
-
-        .apartment-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-start;
-            margin-bottom: 15px;
-        }
-
-        .apartment-details {
-            flex: 1;
-        }
-
-        .apartment-details p {
-            margin: 3px 0;
-            font-size: 13px;
-            color: #666;
-            line-height: 1.5;
-        }
-
-        .apartment-image {
-            width: 120px;
-            height: 80px;
-            background-color: #e0e0e0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 11px;
-            color: #999;
-            border: 1px solid #ccc;
-        }
-
-        .contact-info {
-            margin-top: 10px;
-            font-size: 13px;
-        }
-
-        .contact-info strong {
-            color: #333;
-        }
-
-        .contact-number {
-            color: #2196F3;
-            text-decoration: underline;
-        }
-
-        .details-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-            padding: 0 30px 20px;
-        }
-
-        .detail-item {
-            border-bottom: 1px solid #e0e0e0;
-            padding-bottom: 10px;
-        }
-
-        .detail-label {
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 5px;
-            display: flex;
-            align-items: center;
-        }
-
-        .detail-label svg {
-            margin-right: 5px;
-            width: 16px;
-            height: 16px;
-        }
-
-        .detail-value {
-            font-size: 14px;
-            color: #333;
-            font-weight: 500;
-        }
-
-        .info-section {
-            padding: 0 30px 20px;
-        }
-
-        .info-title {
-            font-size: 14px;
-            font-weight: bold;
-            color: #ff9800;
-            margin-bottom: 10px;
-        }
-
-        .info-text {
-            font-size: 13px;
-            color: #666;
-            line-height: 1.6;
-        }
-
-        .terms-section {
-            padding: 0 30px 30px;
-        }
-
-        .terms-list {
-            list-style-position: inside;
-            padding-left: 0;
-        }
-
-        .terms-list li {
-            font-size: 12px;
-            color: #666;
-            line-height: 1.8;
-            margin-bottom: 8px;
-        }
-
-        .footer {
-            background-color: #ff9800;
-            padding: 15px 30px;
-            text-align: center;
-            color: white;
-            font-size: 13px;
-            font-weight: 500;
-        }
-
-        .city-list {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 10px;
-        }
-
-        @media print {
-            body {
-                padding: 0;
-                background-color: white;
-            }
-            .container {
-                box-shadow: none;
-            }
-        }
-
-        @media (max-width: 768px) {
-            .details-grid {
-                grid-template-columns: 1fr;
-                gap: 15px;
-            }
-
-            .apartment-header {
-                flex-direction: column;
-            }
-
-            .apartment-image {
-                width: 100%;
-                height: 150px;
-                margin-top: 15px;
-            }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <div class="header-info">
-                <strong>Booked on:</strong> ${new Date().toLocaleDateString()}
-            </div>
-            <div class="header-info">
-                <strong>Reservation No.:</strong> <span class="reservation-no">PMS-${Math.floor(Math.random() * 100000)}</span>
-            </div>
-        </div>
-
-        <!-- Main Title -->
-        <div class="main-title">Booking Confirmed</div>
 
         <!-- Company Name -->
         <div class="company-name">Hi ${apartmentname}</div>
@@ -363,10 +136,11 @@ export async function sendEmail(req, res) {
                 <div class="detail-value">${chargeabledays}</div>
             </div>
 
+            ${modeofpayment !== 'BTC' ? `
             <div class="detail-item">
                 <div class="detail-label">Amount</div>
                 <div class="detail-value">${amount}</div>
-            </div>
+            </div>` : ''}
 
             <div class="detail-item">
                 <div class="detail-label">Mode of Payment</div>
@@ -415,30 +189,30 @@ export async function sendEmail(req, res) {
 </body>
 </html>`;
 
-    // ✅ Send the email
-    const { data, error } = await resend.emails.send({
-      from: "hosting@pajasa.com", // Replace later with verified domain
-      to: [apartmentemail],
-      subject,
-      html,
-    });
+        // ✅ Send the email
+        const { data, error } = await resend.emails.send({
+            from: "hosting@pajasa.com", // Replace later with verified domain
+            to: [apartmentemail,"harshitshukla6388@gmail.com"],
+            subject,
+            html,
+        });
 
-    if (error) {
-      console.error("Resend API error:", error);
-      return res.status(400).json({ error });
+        if (error) {
+            console.error("Resend API error:", error);
+            return res.status(400).json({ error });
+        }
+
+        // ✅ Success response
+        res.status(200).json({
+            success: true,
+            message: "Email sent successfully",
+            data,
+        });
+
+    } catch (error) {
+        console.error("Error sending email:", error);
+        res.status(500).json({
+            error: "Internal server error while sending email",
+        });
     }
-
-    // ✅ Success response
-    res.status(200).json({
-      success: true,
-      message: "Email sent successfully",
-      data,
-    });
-
-  } catch (error) {
-    console.error("Error sending email:", error);
-    res.status(500).json({
-      error: "Internal server error while sending email",
-    });
-  }
 }

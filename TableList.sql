@@ -182,3 +182,11 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS reservation_versions (
+    id SERIAL PRIMARY KEY,
+    reservation_id INTEGER REFERENCES reservations(id) ON DELETE CASCADE,
+    change_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    snapshot_data JSONB,
+    changed_by VARCHAR(255)
+);

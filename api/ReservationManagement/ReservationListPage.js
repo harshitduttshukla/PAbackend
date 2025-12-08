@@ -12,14 +12,14 @@ export const getAllReservations = async (req, res) => {
         p.caretaker_name,p.caretaker_number,p.property_url,
         c.client_name,c.state,c.zip_code
       FROM reservations r
-      JOIN room_bookings rb ON r.id = rb.reservation_id
+      LEFT JOIN room_bookings rb ON r.id = rb.reservation_id
       JOIN properties p ON r.property_id = p.property_id
       JOIN clients c ON r.client_id = c.id
       ORDER BY r.created_at DESC
     `;
 
     const result = await pool.query(query);
-  
+
     res.status(200).json({ data: result.rows });
   } catch (error) {
     console.error('Error fetching reservations:', error);
@@ -33,8 +33,8 @@ export async function deleteReservation(req, res) {
     await pool.query("BEGIN"); // ✅ Start transaction
 
     const reservationId = parseInt(req.query.id);
-    console.log(req.query.id);
-    
+    console.log("delete", req.query.id);
+
 
     if (isNaN(reservationId)) {
       return res.status(400).json({
