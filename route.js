@@ -26,7 +26,7 @@ import { Pincode } from "./api/Pincode/Pincodeinfo.js";
 import { AllPinCode } from "./api/Pincode/PincodeListPage.js"
 
 
-// pincode 
+// pinc
 router.post("/Pincode", Pincode)
 router.get("/AllPinCode", AllPinCode)
 
