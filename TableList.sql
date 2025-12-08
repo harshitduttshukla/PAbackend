@@ -159,3 +159,26 @@ CREATE TABLE reservation_additional_info (
     note TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS reservation_additional_guests (
+    id SERIAL PRIMARY KEY,
+    reservation_id INTEGER REFERENCES reservations(id) ON DELETE CASCADE,
+    guest_name VARCHAR(255),
+    cid VARCHAR(50), -- Check-in Date ? No, likely CID/Client ID proof? Or CheckInDate? The JS uses 'cid' and 'cod', suggesting check in date/check out date maybe? Or IDs?
+    -- In ReservationInfo.js: cid, cod, room_type, occupancy, address.
+    cid DATE,
+    cod DATE,
+    room_type VARCHAR(100),
+    occupancy INTEGER,
+    address TEXT,
+    email VARCHAR(255),          -- NEW
+    contact_number VARCHAR(20)   -- NEW
+);
+
+CREATE TABLE IF NOT EXISTS users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

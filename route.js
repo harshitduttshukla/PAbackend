@@ -4,6 +4,14 @@ import { getAllHosts, deleteHost, updateHost } from "./api/Hostapi/hostListPage.
 
 const router = express.Router();
 
+import { signup, signin, logout } from "./api/Auth/authController.js";
+
+// Auth
+router.post("/signup", signup);
+router.post("/signin", signin);
+router.post("/logout", logout);
+
+
 
 // Host 
 router.post("/hosts", createHost);
