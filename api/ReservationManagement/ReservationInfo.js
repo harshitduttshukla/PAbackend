@@ -9,6 +9,9 @@ export async function ClientList(req, res) {
     `;
     const result = await pool.query(query, [`%${clientName}%`]);
 
+    console.log("result", result.rows);
+
+
     res.status(200).json({
       success: true,
       message: "Client fetched successfully",
@@ -272,8 +275,8 @@ export async function saveReservation(req, res) {
       INSERT INTO reservation_additional_info(
       reservation_id, host_name, host_email, host_base_rate,
       host_taxes, host_total_amount, contact_person, contact_number,
-      comments, services, note
-      ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+      comments, services, note, apartment_type, host_payment_mode
+      ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
     `;
 
     await client.query(additionalInfoQuery, [
@@ -288,6 +291,8 @@ export async function saveReservation(req, res) {
       pajasaInfo.comments || "",
       JSON.stringify(pajasaInfo.services || []),
       pajasaInfo.note || "",
+      apartmentInfo.hostTariffType || "",
+      apartmentInfo.hostPaymentMethod || ""
     ]);
 
     /**
@@ -296,9 +301,9 @@ export async function saveReservation(req, res) {
     if (guestInfo.additionalGuests && guestInfo.additionalGuests.length > 0) {
       const additionalGuestsQuery = `
           INSERT INTO reservation_additional_guests(
-            reservation_id, guest_name, cid, cod, room_type, occupancy, address, email, contact_number
-          ) VALUES ${guestInfo.additionalGuests.map((_, i) => `($1, $${i * 8 + 2}, $${i * 8 + 3}, $${i * 8 + 4}, $${i * 8 + 5}, $${i * 8 + 6}, $${i * 8 + 7}, $${i * 8 + 8}, $${i * 8 + 9})`).join(", ")}
-        `;
+        reservation_id, guest_name, cid, cod, room_type, occupancy, address, email, contact_number
+      ) VALUES ${guestInfo.additionalGuests.map((_, i) => `($1, $${i * 8 + 2}, $${i * 8 + 3}, $${i * 8 + 4}, $${i * 8 + 5}, $${i * 8 + 6}, $${i * 8 + 7}, $${i * 8 + 8}, $${i * 8 + 9})`).join(", ")}
+    `;
 
       const additionalGuestsValues = [reservationId, ...guestInfo.additionalGuests.flatMap(guest => [
         guest.guestName || null,
@@ -344,10 +349,10 @@ async function fetchReservationData(id) {
     SELECT
     r.*,
       c.client_name,
-      p.address1, p.city, p.location, p.property_type,
+      p.address1, p.city, p.location, p.property_type, p.thumbnail, p.property_url,
       rai.host_name, rai.host_email, rai.host_base_rate, rai.host_taxes,
       rai.host_total_amount, rai.contact_person, rai.contact_number as contact_person_number,
-      rai.comments, rai.services, rai.note,
+      rai.comments, rai.services, rai.note, rai.apartment_type, rai.host_payment_mode,
       (
         SELECT json_agg(room_type)
           FROM room_bookings rb
@@ -408,7 +413,7 @@ export async function getReservationHistory(req, res) {
     if (!id) return res.status(400).json({ success: false, message: "Reservation ID is required" });
 
     const query = `
-      SELECT * FROM reservation_versions 
+    SELECT * FROM reservation_versions 
       WHERE reservation_id = $1 
       ORDER BY change_date DESC
     `;
@@ -453,13 +458,13 @@ export async function updateReservation(req, res) {
     SELECT
     r.*,
       c.client_name,
-      p.address1, p.city, p.location, p.property_type,
+      p.address1, p.city, p.location, p.property_type, p.thumbnail, p.property_url,
       rai.host_name, rai.host_email, rai.host_base_rate, rai.host_taxes,
       rai.host_total_amount, rai.contact_person, rai.contact_number as contact_person_number,
-      rai.comments, rai.services, rai.note,
+      rai.comments, rai.services, rai.note, rai.apartment_type, rai.host_payment_mode,
       (SELECT json_agg(room_type) FROM room_bookings rb WHERE rb.reservation_id = r.id) as "roomSelection",
-      (SELECT json_agg(json_build_object(
-          'id', rag.id, 'guestName', rag.guest_name, 'cid', rag.cid, 'cod', rag.cod, 
+        (SELECT json_agg(json_build_object(
+          'id', rag.id, 'guestName', rag.guest_name, 'cid', rag.cid, 'cod', rag.cod,
           'roomType', rag.room_type, 'occupancy', rag.occupancy, 'address', rag.address,
           'email', rag.email, 'contactNumber', rag.contact_number
         )) FROM reservation_additional_guests rag WHERE rag.reservation_id = r.id) as "additionalGuests"
@@ -468,7 +473,7 @@ export async function updateReservation(req, res) {
       LEFT JOIN properties p ON r.property_id = p.property_id
       LEFT JOIN reservation_additional_info rai ON r.id = rai.reservation_id
       WHERE r.id = $1
-    `;
+      `;
     const oldResult = await client.query(oldDataQuery, [id]);
 
     if (oldResult.rows.length > 0) {
@@ -556,8 +561,8 @@ export async function updateReservation(req, res) {
     SET
     host_name = $1, host_email = $2, host_base_rate = $3,
       host_taxes = $4, host_total_amount = $5, contact_person = $6, contact_number = $7,
-      comments = $8, services = $9, note = $10
-        WHERE reservation_id = $11
+      comments = $8, services = $9, note = $10, apartment_type = $11, host_payment_mode = $12
+        WHERE reservation_id = $13
       `;
 
       await client.query(updateInfoQuery, [
@@ -571,6 +576,8 @@ export async function updateReservation(req, res) {
         pajasaInfo.comments || "",
         JSON.stringify(pajasaInfo.services || []),
         pajasaInfo.note || "",
+        apartmentInfo.hostTariffType || "",
+        apartmentInfo.hostPaymentMethod || "",
         id
       ]);
     } else {
@@ -579,8 +586,8 @@ export async function updateReservation(req, res) {
         INSERT INTO reservation_additional_info(
         reservation_id, host_name, host_email, host_base_rate,
         host_taxes, host_total_amount, contact_person, contact_number,
-        comments, services, note
-      ) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        comments, services, note, apartment_type, host_payment_mode
+      ) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
         `;
 
       await client.query(insertInfoQuery, [
@@ -595,6 +602,8 @@ export async function updateReservation(req, res) {
         pajasaInfo.comments || "",
         JSON.stringify(pajasaInfo.services || []),
         pajasaInfo.note || "",
+        apartmentInfo.hostTariffType || "",
+        apartmentInfo.hostPaymentMethod || ""
       ]);
     }
 
