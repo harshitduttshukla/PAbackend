@@ -654,8 +654,7 @@ export async function sendEmail(req, res) {
         // -----------------------------
         const guestResult = await resend.emails.send({
             from: "hosting@pajasa.com",
-            // to: emailList,
-            to: ["harshitshukla6388@gmail.com"],
+            to: emailList,
             subject,
             html: GUEST_TEMPLATE_HTML,
         });
@@ -1229,8 +1228,7 @@ async function sendEmailtoApartment(
 
     const { data, error } = await resend.emails.send({
         from: "hosting@pajasa.com",
-        // to: [host_email, "accounts@pajasaapartments.com", "ps@pajasaapartments.com"],
-        to: ["harshitshukla6388@gmail.com"],
+        to: [host_email, "accounts@pajasaapartments.com", "ps@pajasaapartments.com"],
         subject: `Fwd: Apartments Booking Confirmation (${reservationNo})`,
         html,
     });
