@@ -11,7 +11,8 @@ export const getAllReservations = async (req, res) => {
         p.contact_number AS contact_person_number,
         p.caretaker_name,p.caretaker_number,p.property_url,
         c.client_name,c.state,c.zip_code,
-        rai.apartment_type, rai.host_payment_mode,rai.host_email
+        rai.apartment_type, rai.host_payment_mode,rai.host_email,
+        COALESCE(rai.services, '{}'::jsonb) AS services
       FROM reservations r
       LEFT JOIN room_bookings rb ON r.id = rb.reservation_id
       JOIN properties p ON r.property_id = p.property_id
@@ -21,6 +22,8 @@ export const getAllReservations = async (req, res) => {
     `;
 
     const result = await pool.query(query);
+    console.log("data",result.rows);
+    
     res.status(200).json({ data: result.rows });
   } catch (error) {
     console.error('Error fetching reservations:', error);

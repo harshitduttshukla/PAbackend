@@ -1,5 +1,6 @@
 import { Resend } from "resend";
-import { formatDateExact } from "../../helpers/formatDate.js";
+import { formatDateExact} from "../../helpers/formatDate.js";
+import { formatServices} from "../../helpers/formatServices.js";
 
 const resend = new Resend(process.env.RESEND_API_KEY); // ✅ Load from .env
 
@@ -31,7 +32,11 @@ export async function sendEmail(req, res) {
             occupancy,
             base_rate,
             taxes,
+            services
         } = req.body;
+
+      console.log("Services",services);
+
 
         // Convert guestemail -> array
         const emailList = guestemail
@@ -467,7 +472,7 @@ export async function sendEmail(req, res) {
                                                                     <tbody>
                                                                         <tr>
                                                                             <td>
-                                                                                <span style="color:rgb(74,74,74)"><span style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px">Accommodation,Morning Breakfast, Wi-fi </span></span><br>
+                                                                                <span style="color:rgb(74,74,74)"><span style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px">Accommodation,${formatServices(services)} </span></span><br>
                                                                             </td>
                                                                         </tr>
                                                                     </tbody>
@@ -612,7 +617,8 @@ export async function sendEmail(req, res) {
             address1,
             address2,
             address3,
-            occupancy
+            occupancy,
+            services
         );
 
         if (aptResult.error) {
@@ -624,8 +630,8 @@ export async function sendEmail(req, res) {
         // -----------------------------
         const guestResult = await resend.emails.send({
             from: "hosting@pajasa.com",
-            to: emailList,
-            // to: ["harshitshukla6388@gmail.com"],
+            // to: emailList,
+            to: ["harshitshukla6388@gmail.com"],
             subject,
             html: GUEST_TEMPLATE_HTML,
         });
@@ -670,7 +676,8 @@ async function sendEmailtoApartment(
     address1,
     address2,
     address3,
-    occupancy
+    occupancy,
+    services
 ) {
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -1075,7 +1082,7 @@ async function sendEmailtoApartment(
                                                                         <tbody>
                                                                             <tr>
                                                                                 <td>
-                                                                                    <span style="color:rgb(74,74,74)"><span style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px">Accommodation,Morning Breakfast, Wi-fi</span></span><br>
+                                                                                    <span style="color:rgb(74,74,74)"><span style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px">Accommodation,${formatServices(services)}</span></span><br>
                                                                                 </td>
                                                                             </tr>
                                                                         </tbody>
@@ -1200,8 +1207,8 @@ async function sendEmailtoApartment(
 
     const { data, error } = await resend.emails.send({
         from: "hosting@pajasa.com",
-        to: [host_email, "accounts@pajasaapartments.com", "ps@pajasaapartments.com"],
-        // to: ["harshitshukla6388@gmail.com"],
+        // to: [host_email, "accounts@pajasaapartments.com", "ps@pajasaapartments.com"],
+        to: ["harshitshukla6388@gmail.com"],
         subject: `Apartments Booking Confirmation (${reservationNo})`,
         html,
     });
