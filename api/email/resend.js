@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { formatDateExact } from "../../helpers/formatDate.js";
 
 const resend = new Resend(process.env.RESEND_API_KEY); // ✅ Load from .env
 
@@ -27,7 +28,9 @@ export async function sendEmail(req, res) {
             address1,
             address2,
             address3,
-            occupancy
+            occupancy,
+            base_rate,
+            taxes,
         } = req.body;
 
         // Convert guestemail -> array
@@ -36,9 +39,29 @@ export async function sendEmail(req, res) {
             .map(e => e.trim())
             .filter(e => e);
 
+        const taxAmount = (base_rate * taxes) / 100;
 
         const date = new Date(created_at)
         const formatted = date.toISOString().split("T")[0]
+
+
+
+        const paymentDetails =  modeofpayment === "Bill to Company"
+                                ? "As Per Contract"
+                                : `
+                                <div>Base Rate: Rs ${base_rate}</div>
+                                <div>Tax (${taxes}%): Rs ${taxAmount}</div>
+                                <div>
+                                    <strong style="color: black;">
+                                    Chargeable Amount (Per Night): Rs ${amount}
+                                    </strong>
+                                </div>
+                                <div>
+                                    <strong style="color: red;">
+                                    Amount to Pay: Rs ${amount * chargeabledays}
+                                    </strong>
+                                </div>
+                                `;
 
         const GUEST_TEMPLATE_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -221,7 +244,7 @@ export async function sendEmail(req, res) {
                                                                         <tr>
                                                                             <td>
                                                                                 <p style="font:bold 12px tahoma;color:#333333">Check In</p>
-                                                                                <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${checkin}</span>
+                                                                                <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkin)}</span>
                                                                                 <br>
                                                                             </td>
                                                                         </tr>
@@ -241,7 +264,7 @@ export async function sendEmail(req, res) {
                                                                         <tr>
                                                                             <td width="45%">
                                                                                 <p style="font:bold 12px tahoma;color:#333333">Check Out</p>
-                                                                                <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${checkout}</span>
+                                                                                <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkout)}</span>
                                                                                 <br>
                                                                             </td>
                                                                         </tr>
@@ -293,7 +316,8 @@ export async function sendEmail(req, res) {
                                                                         <tr>
                                                                             <td>
                                                                                 <p style="font:bold 12px tahoma;color:#333333">Amount</p>
-                                                                                <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${modeofpayment === "Bill to Company" ? "As Per Contract" : amount}</span>
+                                                                                <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${paymentDetails}
+                                                                                </span>
                                                                             </td>
                                                                         </tr>
                                                                     </tbody>
@@ -443,7 +467,7 @@ export async function sendEmail(req, res) {
                                                                     <tbody>
                                                                         <tr>
                                                                             <td>
-                                                                                <span style="color:rgb(74,74,74)"><span style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px">Morning Breakfast, Wi-fi </span></span><br>
+                                                                                <span style="color:rgb(74,74,74)"><span style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px">Accommodation,Morning Breakfast, Wi-fi </span></span><br>
                                                                             </td>
                                                                         </tr>
                                                                     </tbody>
@@ -458,60 +482,6 @@ export async function sendEmail(req, res) {
                                 </table>
                             </td>
                         </tr>
-
-                        <!-- Cancellation Charges -->
-                        <tr>
-                            <td width="100%" style="padding:0 30.0px">
-                                <table width="100%" border="0" cellspacing="0" cellpadding="0">
-                                    <tbody>
-                                        <tr>
-                                            <td style="padding:15.0px 0" width="100%">
-                                                <table class="stack-t" cellspacing="0" cellpadding="0" border="0" align="left" width="170">
-                                                    <tbody>
-                                                        <tr>
-                                                            <td style="padding:5.0px 0" align="left" width="100%">
-                                                                <table cellpadding="0" cellspacing="0" width="100%">
-                                                                    <tbody>
-                                                                        <tr>
-                                                                            <td width="30%"><span style="color:rgb(74,74,74)"><b><span style="font-family:Helvetica,arial,sans-serif"><span style="color:#f59f0d;font-weight:bold">Cancellation Charges :</span></span></b></span><br></td>
-                                                                        </tr>
-                                                                    </tbody>
-                                                                </table>
-                                                            </td>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                                <table class="stack-t" cellspacing="0" cellpadding="0" border="0" align="left" width="370">
-                                                    <tbody>
-                                                        <tr>
-                                                            <td style="padding-bottom:5.0px" align="left" width="100%">
-                                                                <table cellpadding="0" cellspacing="0" width="100%">
-                                                                    <tbody>
-                                                                        <tr>
-                                                                            <td>
-                                                                                <p style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px;text-align:justify">
-                                                                                    <span style="color:rgb(74,74,74)"><span style="font-family:Helvetica,arial,sans-serif"><span style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px">
-                                                                                        1. 10% of booking amount if cancellation is done after booking confirmation.<br>
-                                                                                        2. 20% of booking amount or one day retention (whichever is higher) if cancellation is done between 72 hours to 24 hours prior to the booking confirmation.<br>
-                                                                                        3. 100% of booking amount or two days retention (whichever is higher) if cancellation is done less than 24 hours prior to the booking confirmation.<br>
-                                                                                        4. Credit/Debit card cancellations will be charged 3% extra.
-                                                                                    </span></span></span><br>
-                                                                                </p>
-                                                                            </td>
-                                                                        </tr>
-                                                                    </tbody>
-                                                                </table>
-                                                            </td>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </td>
-                        </tr>
-
                         <!-- Terms & Conditions -->
                         <tr>
                             <td width="100%" style="padding:0 30.0px">
@@ -544,10 +514,10 @@ export async function sendEmail(req, res) {
                                                                             <td>
                                                                                 <p style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px;text-align:justify">
                                                                                     <span style="color:rgb(74,74,74)"><span style="font-family:Helvetica,arial,sans-serif"><span style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px">
-                                                                                        1. Standard Check in time 01:00 PM &amp; Check out time 11.00 AM<br>
-                                                                                        2. Please call the caretaker/property manager on the number provided in the voucher for any assistance like directions for reaching the apartment, help with luggage etc.<br>
-                                                                                        3. It is advised to call Property manager/Care-taker 15 mins prior reaching to apartment to avoid any hassels on check-in.<br>
-                                                                                        4. At the time of check in, each guest will need to furnish a printout of the confirmation voucher and a government photo ID (Adhaar/Passport/Pan Card/Driving License/Voter ID) and the company ID if the guest is a company guest.
+                                                                                        1. Check in & Check out Time 14:00 PM & 11:00 AM <br>
+                                                                                        2. Every guest will have to carry a print of the confirmation along with the company and government photo ID at the time of checking in.<br>
+                                                                                        3. Visitors are permitted in the apartment only between 10:00 AM and 7:00 PM  and maximum of One visitors per day is allowed for each apartment. With Prior email approval from the concerned company admin is required for any visitor entry.<br>
+                                                                                        4. Cancellation Terms: Kindly visit PAJASA website for cancelation terms & Conditions.  https://www.pajasaapartments.com/terms-and-conditions/
                                                                                     </span></span></span><br>
                                                                                 </p>
                                                                             </td>
@@ -655,6 +625,7 @@ export async function sendEmail(req, res) {
         const guestResult = await resend.emails.send({
             from: "hosting@pajasa.com",
             to: emailList,
+            // to: ["harshitshukla6388@gmail.com"],
             subject,
             html: GUEST_TEMPLATE_HTML,
         });
@@ -883,7 +854,7 @@ async function sendEmailtoApartment(
                                                                             <tr>
                                                                                 <td>
                                                                                     <p style="font:bold 12px tahoma;color:#333333">Check In</p>
-                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${checkin}</span> <br>
+                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkin)}</span> <br>
                                                                                 </td>
                                                                             </tr>
                                                                         </tbody>
@@ -902,7 +873,7 @@ async function sendEmailtoApartment(
                                                                             <tr>
                                                                                 <td width="45%">
                                                                                     <p style="font:bold 12px tahoma;color:#333333">Check Out</p>
-                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${checkout}</span>
+                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkout)}</span>
                                                                                     <br>
                                                                                 </td>
                                                                             </tr>
@@ -1104,7 +1075,7 @@ async function sendEmailtoApartment(
                                                                         <tbody>
                                                                             <tr>
                                                                                 <td>
-                                                                                    <span style="color:rgb(74,74,74)"><span style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px">Morning Breakfast, Wi-fi</span></span><br>
+                                                                                    <span style="color:rgb(74,74,74)"><span style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px">Accommodation,Morning Breakfast, Wi-fi</span></span><br>
                                                                                 </td>
                                                                             </tr>
                                                                         </tbody>
@@ -1152,9 +1123,10 @@ async function sendEmailtoApartment(
                                                                                 <td>
                                                                                     <p style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px;text-align:justify">
                                                                                         <span style="color:rgb(74,74,74)"><span style="font-family:Helvetica,arial,sans-serif"><span style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px">
-                                                                                            1. Standard Check in time 01:00 PM &amp; Check out time 11.00 AM<br>
-                                                                                            2. Please call the caretaker/property manager on the number provided in the voucher for any assistance like directions for reaching the apartment, help with luggage etc.<br>
-                                                                                            3. At the time of check in, each guest will need to furnish a printout of the confirmation voucher and a government photo ID (Adhaar/Passport/Pan Card/Driving License/Voter ID) and the company ID if the guest is a company guest.
+                                                                                            1. Check in & Check out Time 14:00 PM & 11:00 AM <br>
+                                                                                            2. Every guest will have to carry a print of the confirmation along with the company and government photo ID at the time of checking in. <br>
+                                                                                            3. Visitors are permitted in the apartment only between 10:00 AM and 7:00 PM  and maximum of One visitors per day is allowed for each apartment. With Prior email approval from the concerned company admin is required for any visitor entry.<br>
+                                                                                            4. Cancellation Terms: Kindly visit PAJASA website for cancelation terms & Conditions.  https://www.pajasaapartments.com/terms-and-conditions/  
                                                                                         </span></span></span><br>
                                                                                     </p>
                                                                                 </td>
@@ -1229,7 +1201,8 @@ async function sendEmailtoApartment(
     const { data, error } = await resend.emails.send({
         from: "hosting@pajasa.com",
         to: [host_email, "accounts@pajasaapartments.com", "ps@pajasaapartments.com"],
-        subject: `Fwd: Apartments Booking Confirmation (${reservationNo})`,
+        // to: ["harshitshukla6388@gmail.com"],
+        subject: `Apartments Booking Confirmation (${reservationNo})`,
         html,
     });
 

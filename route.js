@@ -1,10 +1,22 @@
 import express from "express";
 import createHost from "./api/Hostapi/HostInfo.js";
 import { getAllHosts, deleteHost, updateHost } from "./api/Hostapi/hostListPage.js"
+import { signup, signin, logout } from "./api/Auth/authController.js";
+import { getPinCode, getHost, createProperty } from "./api/Property/propertyinfo.js"
+import { Pincode } from "./api/Pincode/Pincodeinfo.js";
+import { AllPinCode } from "./api/Pincode/PincodeListPage.js"
+import { getallProperty, deleteProperty, getPropertyById, UpdateProperty } from "./api/Property/propertyListPage.js";
+import { insertClient } from "./api/Client/Clientinfo.js"
+import { ClientListPage, deleteClient, updateClient } from "./api/Client/ClientListPage.js"
+import { getClientById } from "./api/Client/ClientListPage.js";
+import { ClientList, getProperty, checkRoomAvailability, saveReservation, getReservationById, updateReservation, getReservationHistory } from "./api/ReservationManagement/ReservationInfo.js"
+import { getAllReservations, deleteReservation } from "./api/ReservationManagement/ReservationListPage.js"
+import { sendEmail } from "./api/email/resend.js";
+import { createInvoice } from "./api/invioce/invioceform.js"
+import { getAllInvoices } from "./api/invioce/invoiceListPage.js"
 
 const router = express.Router();
 
-import { signup, signin, logout } from "./api/Auth/authController.js";
 
 // Auth
 router.post("/signup", signup);
@@ -21,9 +33,6 @@ router.put("/updateHost/:id", updateHost);
 
 
 // property
-import { getPinCode, getHost, createProperty } from "./api/Property/propertyinfo.js"
-import { Pincode } from "./api/Pincode/Pincodeinfo.js";
-import { AllPinCode } from "./api/Pincode/PincodeListPage.js"
 
 
 // pinc
@@ -39,7 +48,6 @@ router.get("/host", getHost);
 
 router.post("/properties", createProperty);
 
-import { getallProperty, deleteProperty, getPropertyById, UpdateProperty } from "./api/Property/propertyListPage.js";
 
 router.get("/properties", getallProperty);
 router.get("/property/:id", getPropertyById);
@@ -49,8 +57,6 @@ router.delete("/deleteProperty/:id", deleteProperty)
 
 
 // client
-import { insertClient } from "./api/Client/Clientinfo.js"
-import { ClientListPage, deleteClient, updateClient } from "./api/Client/ClientListPage.js"
 
 
 router.post("/insertClient", insertClient);
@@ -58,12 +64,10 @@ router.post("/insertClient", insertClient);
 router.get("/clients", ClientListPage);
 router.delete("/deleteClient/:id", deleteClient);
 router.put("/updateClient/:id", updateClient);
-import { getClientById } from "./api/Client/ClientListPage.js";
 router.get("/client/:id", getClientById);
 
 
 // Reservation
-import { ClientList, getProperty, checkRoomAvailability, saveReservation, getReservationById, updateReservation, getReservationHistory } from "./api/ReservationManagement/ReservationInfo.js"
 
 router.get("/clientRM", ClientList);
 router.get("/Property", getProperty);
@@ -74,16 +78,12 @@ router.put("/updateReservation", updateReservation);
 
 
 // Reservation List
-import { getAllReservations, deleteReservation } from "./api/ReservationManagement/ReservationListPage.js"
-import { sendEmail } from "./api/email/resend.js";
 
 router.get("/getAllReservations", getAllReservations);
 router.delete("/deleteReservation", deleteReservation)
 router.post("/sendemail", sendEmail);
 router.get("/getReservationHistory", getReservationHistory);
 
-import { createInvoice } from "./api/invioce/invioceform.js"
-import { getAllInvoices } from "./api/invioce/invoiceListPage.js"
 
 router.post("/createInvoice", createInvoice)
 router.get("/getAllInvoices", getAllInvoices)

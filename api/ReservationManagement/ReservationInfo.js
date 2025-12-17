@@ -216,7 +216,7 @@ export async function saveReservation(req, res) {
       checkOutDate,
       guestInfo.checkInTime || "",
       guestInfo.checkOutTime || "",
-      toInt(guestInfo.occupancy),
+      guestInfo.occupancy,
       toFloat(guestInfo.baseRate),
       toFloat(guestInfo.taxes),
       toFloat(guestInfo.totalTariff),
@@ -225,6 +225,7 @@ export async function saveReservation(req, res) {
       toInt(guestInfo.chargeableDays),
       guestInfo.adminEmail || "",
       createdAt || new Date(),
+      "Confiremed"
     ];
 
     const reservationQuery = `
@@ -232,9 +233,9 @@ export async function saveReservation(req, res) {
         reservation_no, client_id, property_id, guest_name, guest_email,
         contact_number, check_in_date, check_out_date, check_in_time,
         check_out_time, occupancy, base_rate, taxes, total_tariff,
-        payment_mode, tariff_type, chargeable_days, admin_email, created_at
+        payment_mode, tariff_type, chargeable_days, admin_email, created_at,status
       )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
       RETURNING id
     `;
 
@@ -262,7 +263,7 @@ export async function saveReservation(req, res) {
           room,
           checkInDate,
           checkOutDate,
-          "active",
+          "Confirmed",
         ]);
       }
     }
@@ -501,8 +502,8 @@ export async function updateReservation(req, res) {
     client_id = $1, property_id = $2, guest_name = $3, guest_email = $4,
       contact_number = $5, check_in_date = $6, check_out_date = $7, check_in_time = $8,
       check_out_time = $9, occupancy = $10, base_rate = $11, taxes = $12, total_tariff = $13,
-      payment_mode = $14, tariff_type = $15, chargeable_days = $16, admin_email = $17
-      WHERE id = $18
+      payment_mode = $14, tariff_type = $15, chargeable_days = $16, admin_email = $17,status = $18
+      WHERE id = $19
       `;
 
     const reservationValues = [
@@ -523,6 +524,7 @@ export async function updateReservation(req, res) {
       guestInfo.tariffType || "",
       toInt(guestInfo.chargeableDays),
       guestInfo.adminEmail || "",
+      "Extended",
       id
     ];
 

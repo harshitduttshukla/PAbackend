@@ -61,7 +61,11 @@ export async function deleteReservation(req, res) {
     await pool.query(deleteAdditionalInfoQuery, [reservationId]);
 
     // ✅ Delete from main reservations table
-    const deleteReservationQuery = `DELETE FROM reservations WHERE id = $1`;
+    const deleteReservationQuery = `
+    UPDATE reservations
+    SET status = 'Cancelled'
+    WHERE id = $1
+    `;
     await pool.query(deleteReservationQuery, [reservationId]);
 
     await pool.query("COMMIT"); // ✅ Commit transaction
