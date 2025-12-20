@@ -172,9 +172,11 @@ export async function saveReservation(req, res) {
       guestInfo,
       apartmentInfo,
       pajasaInfo,
-      roomSelection,
+      roomSelection: rawRoomSelection,
       createdAt,
     } = req.body;
+
+    const roomSelection = rawRoomSelection ? [...new Set(rawRoomSelection)] : [];
 
     // Generate reservation number
     // Format: PAR-YY-MM-000001
@@ -440,9 +442,11 @@ export async function updateReservation(req, res) {
       guestInfo,
       apartmentInfo,
       pajasaInfo,
-      roomSelection,
+      roomSelection: rawRoomSelection,
       additionalGuests
     } = req.body;
+
+    const roomSelection = rawRoomSelection ? [...new Set(rawRoomSelection)] : [];
 
     if (!id) {
       throw new Error("Reservation ID is required for update");

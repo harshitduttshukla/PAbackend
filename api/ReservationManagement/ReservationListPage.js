@@ -5,7 +5,7 @@ export const getAllReservations = async (req, res) => {
     const query = `
       SELECT 
         r.*,
-        rb.room_type,
+        STRING_AGG(DISTINCT rb.room_type, ', ') AS room_type,
         p.property_type,p.address1,p.address2,p.address3,
         p.Location,p.city,p.Landmark,p.contact_person,
         p.contact_number AS contact_person_number,
@@ -18,12 +18,21 @@ export const getAllReservations = async (req, res) => {
       JOIN properties p ON r.property_id = p.property_id
       JOIN clients c ON r.client_id = c.id
       LEFT JOIN reservation_additional_info rai ON r.id = rai.reservation_id
+      GROUP BY 
+        r.id,
+        p.property_type,p.address1,p.address2,p.address3,
+        p.Location,p.city,p.Landmark,p.contact_person,
+        p.contact_number,
+        p.caretaker_name,p.caretaker_number,p.property_url,
+        c.client_name,c.state,c.zip_code,
+        rai.apartment_type, rai.host_payment_mode,rai.host_email,
+        rai.services
       ORDER BY r.created_at DESC
     `;
 
     const result = await pool.query(query);
-    console.log("data",result.rows);
-    
+    console.log("data", result.rows);
+
     res.status(200).json({ data: result.rows });
   } catch (error) {
     console.error('Error fetching reservations:', error);
@@ -37,7 +46,7 @@ export async function deleteReservation(req, res) {
     await pool.query("BEGIN"); // ✅ Start transaction
 
     const reservationId = parseInt(req.query.id);
-    console.log("delete", req.query.id);
+   
 
 
     if (isNaN(reservationId)) {
