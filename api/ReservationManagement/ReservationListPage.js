@@ -12,12 +12,17 @@ export const getAllReservations = async (req, res) => {
         p.caretaker_name,p.caretaker_number,p.property_url,
         c.client_name,c.state,c.zip_code,
         rai.apartment_type, rai.host_payment_mode,rai.host_email,
+        COALESCE(
+          JSON_AGG(rag.*) FILTER (WHERE rag.id IS NOT NULL), 
+          '[]'
+        ) AS "additionalGuests",
         COALESCE(rai.services, '{}'::jsonb) AS services
       FROM reservations r
       LEFT JOIN room_bookings rb ON r.id = rb.reservation_id
       JOIN properties p ON r.property_id = p.property_id
       JOIN clients c ON r.client_id = c.id
       LEFT JOIN reservation_additional_info rai ON r.id = rai.reservation_id
+      LEFT JOIN reservation_additional_guests rag ON r.id = rag.reservation_id
       GROUP BY 
         r.id,
         p.property_type,p.address1,p.address2,p.address3,
@@ -46,7 +51,7 @@ export async function deleteReservation(req, res) {
     await pool.query("BEGIN"); // ✅ Start transaction
 
     const reservationId = parseInt(req.query.id);
-   
+
 
 
     if (isNaN(reservationId)) {

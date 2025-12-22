@@ -520,7 +520,7 @@ export async function updateReservation(req, res) {
       checkOutDate,
       guestInfo.checkInTime || "",
       guestInfo.checkOutTime || "",
-      toInt(guestInfo.occupancy),
+      guestInfo.occupancy,
       toFloat(guestInfo.baseRate),
       toFloat(guestInfo.taxes),
       toFloat(guestInfo.totalTariff),
