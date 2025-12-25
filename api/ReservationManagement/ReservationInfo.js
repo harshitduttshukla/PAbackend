@@ -481,13 +481,13 @@ export async function updateReservation(req, res) {
       `;
     const oldResult = await client.query(oldDataQuery, [id]);
 
-    if (oldResult.rows.length > 0) {
-      const oldData = oldResult.rows[0];
-      await client.query(
-        "INSERT INTO reservation_versions (reservation_id, snapshot_data) VALUES ($1, $2)",
-        [id, JSON.stringify(oldData)]
-      );
-    }
+    // if (oldResult.rows.length > 0) {
+    //   const oldData = oldResult.rows[0];
+    //   await client.query(
+    //     "INSERT INTO reservation_versions (reservation_id, snapshot_data) VALUES ($1, $2)",
+    //     [id, JSON.stringify(oldData)]
+    //   );
+    // }
 
     // ✅ Ensure date fields come from guestInfo
     const checkInDate =

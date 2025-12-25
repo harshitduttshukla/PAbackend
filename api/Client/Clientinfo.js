@@ -18,7 +18,7 @@ export async function insertClient(req, res) {
       web_address,
     } = req.body;
 
-    console.log(req.body);
+    
 
 
     const query = `

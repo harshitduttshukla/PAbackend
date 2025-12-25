@@ -13,7 +13,11 @@ export const getAllReservations = async (req, res) => {
         c.client_name,c.state,c.zip_code,
         rai.apartment_type, rai.host_payment_mode,rai.host_email,
         COALESCE(
-          JSON_AGG(rag.*) FILTER (WHERE rag.id IS NOT NULL), 
+          (
+            SELECT JSON_AGG(rag.*) 
+            FROM reservation_additional_guests rag 
+            WHERE rag.reservation_id = r.id
+          ), 
           '[]'
         ) AS "additionalGuests",
         COALESCE(rai.services, '{}'::jsonb) AS services
@@ -22,7 +26,6 @@ export const getAllReservations = async (req, res) => {
       JOIN properties p ON r.property_id = p.property_id
       JOIN clients c ON r.client_id = c.id
       LEFT JOIN reservation_additional_info rai ON r.id = rai.reservation_id
-      LEFT JOIN reservation_additional_guests rag ON r.id = rag.reservation_id
       GROUP BY 
         r.id,
         p.property_type,p.address1,p.address2,p.address3,
@@ -36,7 +39,7 @@ export const getAllReservations = async (req, res) => {
     `;
 
     const result = await pool.query(query);
-    console.log("data", result.rows);
+    
 
     res.status(200).json({ data: result.rows });
   } catch (error) {

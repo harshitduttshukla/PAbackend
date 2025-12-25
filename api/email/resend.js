@@ -1,6 +1,6 @@
 import { Resend } from "resend";
-import { formatDateExact} from "../../helpers/formatDate.js";
-import { formatServices} from "../../helpers/formatServices.js";
+import { formatDateExact } from "../../helpers/formatDate.js";
+import { formatServices } from "../../helpers/formatServices.js";
 
 const resend = new Resend(process.env.RESEND_API_KEY); // ✅ Load from .env
 
@@ -32,13 +32,13 @@ export async function sendEmail(req, res) {
             occupancy,
             base_rate,
             taxes,
-            services
+            services,
+            additionalGuests
         } = req.body;
-
-      console.log("Services",services);
-
-
         // Convert guestemail -> array
+
+        console.log("Additional Guests",additionalGuests);
+        
         const emailList = guestemail
             .split(",")
             .map(e => e.trim())
@@ -51,9 +51,9 @@ export async function sendEmail(req, res) {
 
 
 
-        const paymentDetails =  modeofpayment === "Bill to Company"
-                                ? "As Per Contract"
-                                : `
+        const paymentDetails = modeofpayment === "Bill to Company"
+            ? "As Per Contract"
+            : `
                                 <div>Base Rate: Rs ${base_rate}</div>
                                 <div>Tax (${taxes}%): Rs ${taxAmount}</div>
                                 <div>
@@ -67,6 +67,16 @@ export async function sendEmail(req, res) {
                                     </strong>
                                 </div>
                                 `;
+
+        const additionalGuestsHtml =
+  additionalGuests?.length
+    ? additionalGuests.map(g => formatDateExact(g.cod)).join("<br>")
+    : "";
+
+    console.log("additionalGuestsHtml",additionalGuestsHtml);
+    
+
+                        
 
         const GUEST_TEMPLATE_HTML = `<!DOCTYPE html>
 <html lang="en">
@@ -260,6 +270,30 @@ export async function sendEmail(req, res) {
                                                     </tbody>
                                                 </table>
                                                 <!-- Check Out -->
+                                                ${additionalGuestsHtml ? `
+                                                        <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
+                                                        <tbody>
+                                                            <tr>
+                                                                <td width="270" align="left" style="padding:5px 0">
+                                                                    <table width="100%" cellspacing="0" cellpadding="0">
+                                                                        <tbody>
+                                                                            <tr>
+                                                                                <td width="45%">
+                                                                                    <p style="font:bold 12px tahoma;color:#333333">Extend Check Out</p>
+                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${additionalGuestsHtml}</span>
+                                                                                    <br>
+                                                                                    <p style="font:bold 12px tahoma;color:#333333">Previous Check Out</p>
+                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkout)}</span>
+                                                                                    <br>
+                                                                                </td>
+                                                                            </tr>
+                                                                        </tbody>
+                                                                    </table>
+                                                                </td>
+                                                            </tr>
+                                                        </tbody>
+                                                    </table>
+                                                    `: `
                                                 <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
                                                     <tbody>
                                                         <tr>
@@ -278,7 +312,7 @@ export async function sendEmail(req, res) {
                                                             </td>
                                                         </tr>
                                                     </tbody>
-                                                </table>
+                                                </table>`}
                                             </td>
                                         </tr>
                                     </tbody>
@@ -618,7 +652,8 @@ export async function sendEmail(req, res) {
             address2,
             address3,
             occupancy,
-            services
+            services,
+            additionalGuests
         );
 
         if (aptResult.error) {
@@ -677,7 +712,8 @@ async function sendEmailtoApartment(
     address2,
     address3,
     occupancy,
-    services
+    services,
+    additionalGuests
 ) {
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -896,7 +932,6 @@ async function sendEmailtoApartment(
                                     </table>
                                 </td>
                             </tr>
-
                             <tr>
                                 <td style="padding:0 30px" width="100%">
                                     <table cellpadding="0" cellspacing="0" border="0" width="100%">

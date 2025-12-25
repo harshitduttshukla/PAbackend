@@ -164,8 +164,6 @@ CREATE TABLE IF NOT EXISTS reservation_additional_guests (
     id SERIAL PRIMARY KEY,
     reservation_id INTEGER REFERENCES reservations(id) ON DELETE CASCADE,
     guest_name VARCHAR(255),
-    cid VARCHAR(50), -- Check-in Date ? No, likely CID/Client ID proof? Or CheckInDate? The JS uses 'cid' and 'cod', suggesting check in date/check out date maybe? Or IDs?
-    -- In ReservationInfo.js: cid, cod, room_type, occupancy, address.
     cid DATE,
     cod DATE,
     room_type VARCHAR(100),
