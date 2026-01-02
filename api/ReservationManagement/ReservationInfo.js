@@ -410,24 +410,7 @@ export async function getReservationById(req, res) {
   }
 }
 
-export async function getReservationHistory(req, res) {
-  try {
-    const { id } = req.query;
-    if (!id) return res.status(400).json({ success: false, message: "Reservation ID is required" });
 
-    const query = `
-    SELECT * FROM reservation_versions 
-      WHERE reservation_id = $1 
-      ORDER BY change_date DESC
-    `;
-    const result = await pool.query(query, [id]);
-
-    res.json({ success: true, data: result.rows });
-  } catch (error) {
-    console.error("Error fetching history:", error);
-    res.status(500).json({ success: false, message: "Internal server error" });
-  }
-}
 
 export async function updateReservation(req, res) {
   const client = await pool.connect();
