@@ -38,6 +38,10 @@ export async function getProperty(req, res) {
 
     const query = `
       SELECT p.* ,
+        p.master_bedroom,
+        p.common_bedroom,
+        p.check_in_time,
+        p.check_out_time,
         h.host_name,
         h.host_email,
         h.host_contact_number
@@ -49,6 +53,8 @@ export async function getProperty(req, res) {
     `;
 
     const result = await pool.query(query, [`%${Address}%`]);
+    console.log("property data", result);
+
 
     res.json({
       data: result.rows   // or result.rows[0] if you need just one
@@ -353,6 +359,7 @@ async function fetchReservationData(id) {
     r.*,
       c.client_name,
       p.address1, p.city, p.location, p.property_type, p.thumbnail, p.property_url,
+      p.master_bedroom, p.common_bedroom,
       rai.host_name, rai.host_email, rai.host_base_rate, rai.host_taxes,
       rai.host_total_amount, rai.contact_person, rai.contact_number as contact_person_number,
       rai.comments, rai.services, rai.note, rai.apartment_type, rai.host_payment_mode,
@@ -442,27 +449,27 @@ export async function updateReservation(req, res) {
     // or just assume we can fetch it. To be safe within transaction, we should query using `client`.
 
     // FETCH OLD DATA FOR HISTORY
-    const oldDataQuery = `
-    SELECT
-    r.*,
-      c.client_name,
-      p.address1, p.city, p.location, p.property_type, p.thumbnail, p.property_url,
-      rai.host_name, rai.host_email, rai.host_base_rate, rai.host_taxes,
-      rai.host_total_amount, rai.contact_person, rai.contact_number as contact_person_number,
-      rai.comments, rai.services, rai.note, rai.apartment_type, rai.host_payment_mode,
-      (SELECT json_agg(room_type) FROM room_bookings rb WHERE rb.reservation_id = r.id) as "roomSelection",
-        (SELECT json_agg(json_build_object(
-          'id', rag.id, 'guestName', rag.guest_name, 'cid', rag.cid, 'cod', rag.cod,
-          'roomType', rag.room_type, 'occupancy', rag.occupancy, 'address', rag.address,
-          'email', rag.email, 'contactNumber', rag.contact_number
-        )) FROM reservation_additional_guests rag WHERE rag.reservation_id = r.id) as "additionalGuests"
-      FROM reservations r
-      LEFT JOIN clients c ON r.client_id = c.id
-      LEFT JOIN properties p ON r.property_id = p.property_id
-      LEFT JOIN reservation_additional_info rai ON r.id = rai.reservation_id
-      WHERE r.id = $1
-      `;
-    const oldResult = await client.query(oldDataQuery, [id]);
+    // const oldDataQuery = `
+    // SELECT
+    // r.*,
+    //   c.client_name,
+    //   p.address1, p.city, p.location, p.property_type, p.thumbnail, p.property_url,
+    //   rai.host_name, rai.host_email, rai.host_base_rate, rai.host_taxes,
+    //   rai.host_total_amount, rai.contact_person, rai.contact_number as contact_person_number,
+    //   rai.comments, rai.services, rai.note, rai.apartment_type, rai.host_payment_mode,
+    //   (SELECT json_agg(room_type) FROM room_bookings rb WHERE rb.reservation_id = r.id) as "roomSelection",
+    //     (SELECT json_agg(json_build_object(
+    //       'id', rag.id, 'guestName', rag.guest_name, 'cid', rag.cid, 'cod', rag.cod,
+    //       'roomType', rag.room_type, 'occupancy', rag.occupancy, 'address', rag.address,
+    //       'email', rag.email, 'contactNumber', rag.contact_number
+    //     )) FROM reservation_additional_guests rag WHERE rag.reservation_id = r.id) as "additionalGuests"
+    //   FROM reservations r
+    //   LEFT JOIN clients c ON r.client_id = c.id
+    //   LEFT JOIN properties p ON r.property_id = p.property_id
+    //   LEFT JOIN reservation_additional_info rai ON r.id = rai.reservation_id
+    //   WHERE r.id = $1
+    //   `;
+    // const oldResult = await client.query(oldDataQuery, [id]);
 
     // if (oldResult.rows.length > 0) {
     //   const oldData = oldResult.rows[0];

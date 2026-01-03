@@ -8,7 +8,6 @@ export async function sendEmail(req, res) {
     try {
         const {
             guestemail,
-            subject,
             apartmentname,
             contactperson,
             contactnumber,
@@ -16,6 +15,8 @@ export async function sendEmail(req, res) {
             contactnumberguest,
             checkin,
             checkout,
+            check_in_time,
+            check_out_time,
             chargeabledays,
             amount,
             modeofpayment,
@@ -32,13 +33,16 @@ export async function sendEmail(req, res) {
             occupancy,
             base_rate,
             taxes,
+            host_payment_mode,
             services,
             additionalGuests
         } = req.body;
         // Convert guestemail -> array
 
-        console.log("Additional Guests",additionalGuests);
         
+        const Title = additionalGuests?.length? `
+Booking Extended`:`Booking Confirmed`
+        const subject = additionalGuests?.length?`Guest Booking Extension Confirmation (${reservationNo})`:`Guest Booking Confirmation (${reservationNo})`
         const emailList = guestemail
             .split(",")
             .map(e => e.trim())
@@ -73,7 +77,7 @@ export async function sendEmail(req, res) {
     ? additionalGuests.map(g => formatDateExact(g.cod)).join("<br>")
     : "";
 
-    console.log("additionalGuestsHtml",additionalGuestsHtml);
+    
     
 
                         
@@ -137,7 +141,7 @@ export async function sendEmail(req, res) {
                                         <tr>
                                             <td>
                                                 <h1 style="font-family:tahoma;font-size:35px;color:#333333;text-align:left;line-height:1.3">
-                                                    Booking Confirmed
+                                                    ${Title}
                                                 </h1>
                                                 <p style="font:bold 12px tahoma;color:#333333;margin:0;padding-bottom:5px">Hi, <br><br>Thank you for choosing this Apartment</p><br>
                                                 <p style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">
@@ -653,7 +657,9 @@ export async function sendEmail(req, res) {
             address3,
             occupancy,
             services,
-            additionalGuests
+            additionalGuests,
+            host_payment_mode,
+            Title
         );
 
         if (aptResult.error) {
@@ -665,8 +671,8 @@ export async function sendEmail(req, res) {
         // -----------------------------
         const guestResult = await resend.emails.send({
             from: "hosting@pajasa.com",
-            to: emailList,
-            // to: ["harshitshukla6388@gmail.com"],
+            // to: emailList,
+            to: ["harshitshukla6388@gmail.com"],
             subject,
             html: GUEST_TEMPLATE_HTML,
         });
@@ -713,8 +719,11 @@ async function sendEmailtoApartment(
     address3,
     occupancy,
     services,
-    additionalGuests
+    additionalGuests,
+    host_payment_mode,
+    Title
 ) {
+    const subject2 = additionalGuests?.length?`Apartments Booking Extension Confirmation (${reservationNo})`:`Apartments Booking Confirmation (${reservationNo})`
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -774,7 +783,7 @@ async function sendEmailtoApartment(
                                             <tr>
                                                 <td>
                                                     <h1 style="font-family:tahoma;font-size:35px;color:#333333;text-align:left;line-height:1.3">
-                                                        Booking Confirmed
+                                                        ${Title}
                                                     </h1>
                                                     <p style="font:bold 12px tahoma;color:#333333;margin:0;padding-bottom:5px">Hi,Veridical Hospitality <br>
                                                     <br>Thank you for the confirmation</p><br>
@@ -999,7 +1008,7 @@ async function sendEmailtoApartment(
                                                                             <tr>
                                                                                 <td width="45%">
                                                                                     <p style="font:bold 12px tahoma;color:#333333">Mode of Payment</p>
-                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${modeofpayment}</span>
+                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${host_payment_mode}</span>
                                                                                 </td>
                                                                             </tr>
                                                                         </tbody>
@@ -1242,9 +1251,9 @@ async function sendEmailtoApartment(
 
     const { data, error } = await resend.emails.send({
         from: "hosting@pajasa.com",
-        to: [host_email, "accounts@pajasaapartments.com", "ps@pajasaapartments.com"],
-        // to: ["harshitshukla6388@gmail.com"],
-        subject: `Apartments Booking Confirmation (${reservationNo})`,
+        // to: [host_email, "accounts@pajasaapartments.com", "ps@pajasaapartments.com"],
+        to: ["harshitshukla6388@gmail.com"],
+        subject: subject2,
         html,
     });
 
