@@ -1,4 +1,4 @@
-export function formatDateExact(isoString) {
+export function formatDateExact(isoString,checkin) {
   if (!isoString) return "--";
 
   const date = new Date(isoString);
@@ -13,8 +13,11 @@ export function formatDateExact(isoString) {
   const minutes = String(date.getMinutes()).padStart(2, "0");
   const ampm = hours >= 12 ? "PM" : "AM";
   hours = hours % 12 || 12;
+  if(checkin){
 
-  return `${day} ${month}, ${year} ${hours}:${minutes} ${ampm}`;
+    return `${day} ${month}, ${year} ${'02'}:${'00'} ${'pm'}`;
+  }
+  return `${day} ${month}, ${year} ${'11'}:${'00'} ${'am'}`;
 }
 
 

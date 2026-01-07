@@ -39,10 +39,19 @@ export async function sendEmail(req, res) {
         } = req.body;
         // Convert guestemail -> array
 
+        const additionalGuestsDate = additionalGuests?.length ? additionalGuests.map(g  => new Date(g.cod)) : []
+        let Preponed = false
+
+        if(additionalGuestsDate.length > 0){
+            const checkoutDate = new Date(checkout)
+            Preponed = additionalGuestsDate.some(date => date < checkoutDate)
+        }
+
         
-        const Title = additionalGuests?.length? `
-Booking Extended`:`Booking Confirmed`
-        const subject = additionalGuests?.length?`Guest Booking Extension Confirmation (${reservationNo})`:`Guest Booking Confirmation (${reservationNo})`
+        const Title = additionalGuests?.length?(Preponed ? `
+Check Out Preponed`:`
+Booking Extended`):`Booking Confirmed`
+        const subject = additionalGuests?.length?(Preponed ? `Guest Booking Check out Preponed (${reservationNo}) `:`Guest Booking Extension Confirmation (${reservationNo})`):`Guest Booking Confirmation (${reservationNo})`
         const emailList = guestemail
             .split(",")
             .map(e => e.trim())
@@ -71,11 +80,15 @@ Booking Extended`:`Booking Confirmed`
                                     </strong>
                                 </div>
                                 `;
-
+        
+        
         const additionalGuestsHtml =
-  additionalGuests?.length
-    ? additionalGuests.map(g => formatDateExact(g.cod)).join("<br>")
-    : "";
+            additionalGuests?.length
+                ? additionalGuests.map(g => formatDateExact(g.cod,false)).join("<br>")
+                : "";
+
+        console.log("additionalGuestsHtml",additionalGuestsHtml);
+        
 
     
     
@@ -263,7 +276,7 @@ Booking Extended`:`Booking Confirmed`
                                                                         <tr>
                                                                             <td>
                                                                                 <p style="font:bold 12px tahoma;color:#333333">Check In</p>
-                                                                                <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkin)}</span>
+                                                                                <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkin,true)}</span>
                                                                                 <br>
                                                                             </td>
                                                                         </tr>
@@ -287,7 +300,7 @@ Booking Extended`:`Booking Confirmed`
                                                                                     <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${additionalGuestsHtml}</span>
                                                                                     <br>
                                                                                     <p style="font:bold 12px tahoma;color:#333333">Previous Check Out</p>
-                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkout)}</span>
+                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkout,false)}</span>
                                                                                     <br>
                                                                                 </td>
                                                                             </tr>
@@ -307,7 +320,7 @@ Booking Extended`:`Booking Confirmed`
                                                                         <tr>
                                                                             <td width="45%">
                                                                                 <p style="font:bold 12px tahoma;color:#333333">Check Out</p>
-                                                                                <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkout)}</span>
+                                                                                <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkout,false)}</span>
                                                                                 <br>
                                                                             </td>
                                                                         </tr>
@@ -723,7 +736,7 @@ async function sendEmailtoApartment(
     host_payment_mode,
     Title
 ) {
-    const subject2 = additionalGuests?.length?`Apartments Booking Extension Confirmation (${reservationNo})`:`Apartments Booking Confirmation (${reservationNo})`
+    const subject2 = additionalGuests?.length?(Preponed ? `Apartments Booking Check out Preponed (${reservationNo}) `:`Apartments Booking Extension Confirmation (${reservationNo})`):`Apartments Booking Confirmation (${reservationNo})`
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -906,7 +919,7 @@ async function sendEmailtoApartment(
                                                                             <tr>
                                                                                 <td>
                                                                                     <p style="font:bold 12px tahoma;color:#333333">Check In</p>
-                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkin)}</span> <br>
+                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkin,true)}</span> <br>
                                                                                 </td>
                                                                             </tr>
                                                                         </tbody>
@@ -925,7 +938,7 @@ async function sendEmailtoApartment(
                                                                             <tr>
                                                                                 <td width="45%">
                                                                                     <p style="font:bold 12px tahoma;color:#333333">Check Out</p>
-                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkout)}</span>
+                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkout,false)}</span>
                                                                                     <br>
                                                                                 </td>
                                                                             </tr>
