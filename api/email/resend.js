@@ -672,7 +672,8 @@ Booking Extended`):`Booking Confirmed`
             services,
             additionalGuests,
             host_payment_mode,
-            Title
+            Title,
+            Preponed
         );
 
         if (aptResult.error) {
@@ -734,7 +735,8 @@ async function sendEmailtoApartment(
     services,
     additionalGuests,
     host_payment_mode,
-    Title
+    Title,
+    Preponed
 ) {
     const subject2 = additionalGuests?.length?(Preponed ? `Apartments Booking Check out Preponed (${reservationNo}) `:`Apartments Booking Extension Confirmation (${reservationNo})`):`Apartments Booking Confirmation (${reservationNo})`
     const html = `<!DOCTYPE html>
