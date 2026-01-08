@@ -9,11 +9,11 @@ import { getallProperty, deleteProperty, getPropertyById, UpdateProperty } from 
 import { insertClient } from "./api/Client/Clientinfo.js"
 import { ClientListPage, deleteClient, updateClient } from "./api/Client/ClientListPage.js"
 import { getClientById } from "./api/Client/ClientListPage.js";
-import { ClientList, getProperty, checkRoomAvailability, saveReservation, getReservationById, updateReservation} from "./api/ReservationManagement/ReservationInfo.js"
+import { ClientList, getProperty, checkRoomAvailability, saveReservation, getReservationById, updateReservation } from "./api/ReservationManagement/ReservationInfo.js"
 import { getAllReservations, deleteReservation } from "./api/ReservationManagement/ReservationListPage.js"
 import { sendEmail } from "./api/email/resend.js";
 import { createInvoice } from "./api/invioce/invioceform.js"
-import { getAllInvoices } from "./api/invioce/invoiceListPage.js"
+import { getAllInvoices, deleteInvoice, getInvoiceById, updateInvoice } from "./api/invioce/invoiceListPage.js"
 
 const router = express.Router();
 
@@ -86,6 +86,9 @@ router.post("/sendemail", sendEmail);
 
 router.post("/createInvoice", createInvoice)
 router.get("/getAllInvoices", getAllInvoices)
+router.delete("/deleteInvoice/:id", deleteInvoice)
+router.get("/getInvoiceById/:id", getInvoiceById)
+router.put("/updateInvoice/:id", updateInvoice)
 
 
 

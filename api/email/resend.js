@@ -611,14 +611,14 @@ Booking Extended`):`Booking Confirmed`
                                                                             <td>
                                                                                 <div>
                                                                                     <div style="display:-webkit-box; display:flex; flex-wrap:wrap; justify-content:center; gap: 10px;">
-                                                                                        <a href="https://www.pajasaapartments.co.in/city/mumbai/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Mumbai</a>&nbsp;&nbsp;
-                                                                                        <a href="https://www.pajasaapartments.co.in/city/pune/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Pune</a>&nbsp;&nbsp;
-                                                                                        <a href="https://www.pajasaapartments.co.in/city/bangalore/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Bangalore</a>&nbsp;&nbsp;
-                                                                                        <a href="https://www.pajasaapartments.co.in/city/hyderabad/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Hyderabad</a>&nbsp;&nbsp;
-                                                                                        <a href="https://www.pajasaapartments.co.in/city/noida/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Noida</a>&nbsp;&nbsp;
-                                                                                        <a href="https://www.pajasaapartments.co.in/city/delhi/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Delhi</a>&nbsp;&nbsp;
-                                                                                        <a href="https://www.pajasaapartments.co.in/city/gurgaon/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Gurgaon</a>&nbsp;&nbsp;
-                                                                                        <a href="https://www.pajasaapartments.co.in/city/chennai/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Chennai</a>
+                                                                                        <a href="https://www.pajasaapartments.com/in/mumbai/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Mumbai</a>&nbsp;&nbsp;
+                                                                                        <a href="https://www.pajasaapartments.com/in/pune/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Pune</a>&nbsp;&nbsp;
+                                                                                        <a href="https://www.pajasaapartments.com/in/bengaluru/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Bangalore</a>&nbsp;&nbsp;
+                                                                                        <a href="https://www.pajasaapartments.com/in/hyderabad/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Hyderabad</a>&nbsp;&nbsp;
+                                                                                        <a href="http://pajasaapartments.com/in/noida/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Noida</a>&nbsp;&nbsp;
+                                                                                        <a href="https://www.pajasaapartments.com/in/new-delhi/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Delhi</a>&nbsp;&nbsp;
+                                                                                        <a href="https://www.pajasaapartments.com/in/gurugram/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Gurgaon</a>&nbsp;&nbsp;
+                                                                                        <a href="https://www.pajasaapartments.com/in/chennai/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Chennai</a>
                                                                                     </div>
                                                                                 </div>
                                                                             </td>
@@ -685,8 +685,8 @@ Booking Extended`):`Booking Confirmed`
         // -----------------------------
         const guestResult = await resend.emails.send({
             from: "hosting@pajasa.com",
-            // to: emailList,
-            to: ["harshitshukla6388@gmail.com"],
+            to: emailList,
+            // to: ["harshitshukla6388@gmail.com"],
             subject,
             html: GUEST_TEMPLATE_HTML,
         });
@@ -1230,15 +1230,15 @@ async function sendEmailtoApartment(
                                                                                 <td>
                                                                                     <div>
                                                                                         <div style="display:-webkit-box; display:flex; flex-wrap:wrap; justify-content:center; gap: 10px;">
-                                                                                            <a href="https://www.pajasaapartments.co.in/city/mumbai/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Mumbai</a>&nbsp;&nbsp;
-                                                                                            <a href="https://www.pajasaapartments.co.in/city/pune/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Pune</a>&nbsp;&nbsp;
-                                                                                            <a href="https://www.pajasaapartments.co.in/city/bangalore/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Bangalore</a>&nbsp;&nbsp;
-                                                                                            <a href="https://www.pajasaapartments.co.in/city/hyderabad/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Hyderabad</a>&nbsp;&nbsp;
-                                                                                            <a href="https://www.pajasaapartments.co.in/city/noida/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Noida</a>&nbsp;&nbsp;
-                                                                                            <a href="https://www.pajasaapartments.co.in/city/delhi/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Delhi</a>&nbsp;&nbsp;
-                                                                                            <a href="https://www.pajasaapartments.co.in/city/gurgaon/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Gurgaon</a>&nbsp;&nbsp;
-                                                                                            <a href="https://www.pajasaapartments.co.in/city/chennai/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Chennai</a>
-                                                                                        </div>
+                                                                                        <a href="https://www.pajasaapartments.com/in/mumbai/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Mumbai</a>&nbsp;&nbsp;
+                                                                                        <a href="https://www.pajasaapartments.com/in/pune/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Pune</a>&nbsp;&nbsp;
+                                                                                        <a href="https://www.pajasaapartments.com/in/bengaluru/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Bangalore</a>&nbsp;&nbsp;
+                                                                                        <a href="https://www.pajasaapartments.com/in/hyderabad/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Hyderabad</a>&nbsp;&nbsp;
+                                                                                        <a href="http://pajasaapartments.com/in/noida/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Noida</a>&nbsp;&nbsp;
+                                                                                        <a href="https://www.pajasaapartments.com/in/new-delhi/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Delhi</a>&nbsp;&nbsp;
+                                                                                        <a href="https://www.pajasaapartments.com/in/gurugram/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Gurgaon</a>&nbsp;&nbsp;
+                                                                                        <a href="https://www.pajasaapartments.com/in/chennai/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Chennai</a>
+                                                                                    </div>
                                                                                     </div>
                                                                                 </td>
                                                                             </tr>
@@ -1266,8 +1266,8 @@ async function sendEmailtoApartment(
 
     const { data, error } = await resend.emails.send({
         from: "hosting@pajasa.com",
-        // to: [host_email, "accounts@pajasaapartments.com", "ps@pajasaapartments.com"],
-        to: ["harshitshukla6388@gmail.com"],
+        to: [host_email, "accounts@pajasaapartments.com", "ps@pajasaapartments.com"],
+        // to: ["harshitshukla6388@gmail.com"],
         subject: subject2,
         html,
     });
