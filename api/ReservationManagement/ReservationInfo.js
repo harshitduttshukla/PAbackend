@@ -233,7 +233,7 @@ export async function saveReservation(req, res) {
       toInt(guestInfo.chargeableDays),
       guestInfo.adminEmail || "",
       createdAt || new Date(),
-      "Confiremed"
+      "Confirmed"
     ];
 
     const reservationQuery = `
