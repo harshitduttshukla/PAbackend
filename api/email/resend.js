@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { formatDateExact } from "../../helpers/formatDate.js";
 import { formatServices } from "../../helpers/formatServices.js";
+import pool from "../../client.js";
 
 const resend = new Resend(process.env.RESEND_API_KEY); // ✅ Load from .env
 
@@ -692,8 +693,8 @@ export async function sendEmail(req, res) {
         // -----------------------------
         const guestResult = await resend.emails.send({
             from: "hosting@pajasa.com",
-            to: emailList,
-            // to: ["harshitshukla6388@gmail.com"],
+            // to: emailList,
+            to: ["harshitshukla6388@gmail.com"],
             subject,
             html: GUEST_TEMPLATE_HTML,
             attachments
@@ -706,6 +707,13 @@ export async function sendEmail(req, res) {
         // -----------------------------
         // 3️⃣ SUCCESS RESPONSE
         // -----------------------------
+
+        // ✅ Update Email Status in DB
+        await pool.query(
+            "UPDATE reservations SET email_status = 'Sent' WHERE reservation_no = $1",
+            [reservationNo]
+        );
+
         res.json({
             success: true,
             apartmentEmail: aptResult.data,
@@ -1303,8 +1311,8 @@ async function sendEmailtoApartment(
 
     const { data, error } = await resend.emails.send({
         from: "hosting@pajasa.com",
-        to: [host_email, "accounts@pajasaapartments.com", "ps@pajasaapartments.com"],
-        // to: ["harshitshukla6388@gmail.com"],
+        // to: [host_email, "accounts@pajasaapartments.com", "ps@pajasaapartments.com"],
+        to: ["harshitshukla6388@gmail.com"],
         subject: subject2,
         html,
     });
