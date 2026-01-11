@@ -4,6 +4,11 @@ import { formatServices } from "../../helpers/formatServices.js";
 
 const resend = new Resend(process.env.RESEND_API_KEY); // ✅ Load from .env
 
+const formatOccupancy = (occ) => {
+    const map = { 1: "Single", 2: "Double", 3: "Triple", 4: "Quadruple", 5: "Quintuple", 6: "Sextuple" };
+    return map[Number(occ)] || occ;
+};
+
 export async function sendEmail(req, res) {
     try {
         const {
@@ -35,7 +40,8 @@ export async function sendEmail(req, res) {
             taxes,
             host_payment_mode,
             services,
-            additionalGuests
+            additionalGuests,
+            status
         } = req.body;
         // Convert guestemail -> array
 
@@ -48,8 +54,10 @@ export async function sendEmail(req, res) {
         }
 
 
-        const Title = additionalGuests?.length ? (Preponed ? `Check Out Preponed` : `Booking Extended`) : `Booking Confirmed`
-        const subject = additionalGuests?.length ? (Preponed ? `Guest Booking Check out Preponed (${reservationNo}) ` : `Guest Booking Extension Confirmation (${reservationNo})`) : `Guest Booking Confirmation (${reservationNo})`
+        const isExtended = (status === 'Extended' || status === 'extended') || (additionalGuests?.length > 0 && !Preponed);
+
+        const Title = Preponed ? `Check Out Preponed` : (isExtended ? `Booking Extended` : `Booking Confirmed`);
+        const subject = Preponed ? `Guest Booking Check out Preponed (${reservationNo}) ` : (isExtended ? `Guest Booking Extension Confirmation (${reservationNo})` : `Guest Booking Confirmation (${reservationNo})`);
         const emailList = guestemail
             .split(",")
             .map(e => e.trim())
@@ -294,7 +302,7 @@ export async function sendEmail(req, res) {
                                                                         <tbody>
                                                                             <tr>
                                                                                 <td width="45%">
-                                                                                    <p style="font:bold 12px tahoma;color:${Preponed ? 'red' : '#333333'}">${Preponed ? 'Preponed Check Out Date' : 'Extended Check Out Date'}</p>
+                                                                                    <p style="font:bold 12px tahoma;color:${(Preponed || isExtended) ? 'red' : '#333333'}">${Preponed ? 'Preponed Check Out Date' : 'Extended Check Out Date'}</p>
                                                                                     <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${additionalGuestsHtml}</span>
                                                                                     <br>
                                                                                     <p style="font:bold 12px tahoma;color:#333333">Previous Check Out</p>
@@ -474,7 +482,7 @@ export async function sendEmail(req, res) {
                                                                         <tr>
                                                                             <td width="45%">
                                                                                 <p style="font:bold 12px tahoma;color:#333333">Occupancy</p>
-                                                                                <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${occupancy}</span>
+                                                                                <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatOccupancy(occupancy)}</span>
                                                                                 <br>
                                                                             </td>
                                                                         </tr>
@@ -740,7 +748,8 @@ async function sendEmailtoApartment(
         additionalGuests?.length
             ? additionalGuests.map(g => formatDateExact(g.cod, false)).join("<br>")
             : "";
-    const subject2 = additionalGuests?.length ? (Preponed ? `Apartments Booking Check out Preponed (${reservationNo}) ` : `Apartments Booking Extension Confirmation (${reservationNo})`) : `Apartments Booking Confirmation (${reservationNo})`
+    const isExtendedTitle = Title.includes("Extended");
+    const subject2 = Preponed ? `Apartments Booking Check out Preponed (${reservationNo}) ` : (isExtendedTitle ? `Apartments Booking Extension Confirmation (${reservationNo})` : `Apartments Booking Confirmation (${reservationNo})`);
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -942,7 +951,7 @@ async function sendEmailtoApartment(
                                                                         <tbody>
                                                                             <tr>
                                                                                 <td width="45%">
-                                                                                    <p style="font:bold 12px tahoma;color:${Preponed ? 'red' : '#333333'}">${Preponed ? 'Preponed Check Out Date' : 'Extended Check Out Date'}</p>
+                                                                                    <p style="font:bold 12px tahoma;color:${(Preponed || Title.includes('Extended')) ? 'red' : '#333333'}">${Preponed ? 'Preponed Check Out Date' : 'Extended Check Out Date'}</p>
                                                                                     <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${additionalGuestsHtml}</span>
                                                                                     <br>
                                                                                     <p style="font:bold 12px tahoma;color:#333333">Previous Check Out</p>
@@ -1120,7 +1129,7 @@ async function sendEmailtoApartment(
                                                                             <tr>
                                                                                 <td width="45%">
                                                                                     <p style="font:bold 12px tahoma;color:#333333">Occupancy</p>
-                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${occupancy}</span>
+                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatOccupancy(occupancy)}</span>
                                                                                     <br>
                                                                                 </td>
                                                                             </tr>
