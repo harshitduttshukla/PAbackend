@@ -9,7 +9,7 @@ import { getallProperty, deleteProperty, getPropertyById, UpdateProperty } from 
 import { insertClient } from "./api/Client/Clientinfo.js"
 import { ClientListPage, deleteClient, updateClient } from "./api/Client/ClientListPage.js"
 import { getClientById } from "./api/Client/ClientListPage.js";
-import { ClientList, getProperty, checkRoomAvailability, saveReservation, getReservationById, updateReservation } from "./api/ReservationManagement/ReservationInfo.js"
+import { ClientList, getProperty, checkRoomAvailability, saveReservation, getReservationById, updateReservation, getReservationHistory } from "./api/ReservationManagement/ReservationInfo.js"
 import { getAllReservations, deleteReservation } from "./api/ReservationManagement/ReservationListPage.js"
 import { sendEmail } from "./api/email/resend.js";
 import { createInvoice } from "./api/invioce/invioceform.js"
@@ -75,6 +75,7 @@ router.post("/checkRoomAvailability", checkRoomAvailability);
 router.post("/Reservation", saveReservation);
 router.get("/getReservationById", getReservationById);
 router.put("/updateReservation", updateReservation);
+router.get("/getReservationHistory", getReservationHistory);
 
 
 // Reservation List

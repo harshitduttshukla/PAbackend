@@ -43,6 +43,7 @@ export async function sendEmail(req, res) {
             services,
             additionalGuests,
             status,
+            modification_status,
             attachments
         } = req.body;
         // Convert guestemail -> array
@@ -50,16 +51,60 @@ export async function sendEmail(req, res) {
         const additionalGuestsDate = additionalGuests?.length ? additionalGuests.map(g => new Date(g.cod)) : []
         let Preponed = false
 
+        // Existing partial preponed logic (legacy/specific use case)
         if (additionalGuestsDate.length > 0) {
             const checkoutDate = new Date(checkout)
             Preponed = additionalGuestsDate.some(date => date < checkoutDate)
         }
 
-
         const isExtended = (status === 'Extended' || status === 'extended') || (additionalGuests?.length > 0 && !Preponed);
 
-        const Title = Preponed ? `Check Out Preponed` : (isExtended ? `Booking Extended` : `Booking Confirmed`);
-        const subject = Preponed ? `Guest Booking Check out Preponed (${reservationNo}) ` : (isExtended ? `Guest Booking Extension Confirmation (${reservationNo})` : `Guest Booking Confirmation (${reservationNo})`);
+        let Title = Preponed ? `Check Out Preponed` : (isExtended ? `Booking Extended` : `Booking Confirmed`);
+        let subject = Preponed ? `Guest Booking Check out Preponed (${reservationNo}) ` : (isExtended ? `Guest Booking Extension Confirmation (${reservationNo})` : `Guest Booking Confirmation (${reservationNo})`);
+
+        // New Logic: Override if modification_status is provided
+        let previousCheckIn = null;
+        let previousCheckOut = null;
+
+        if (modification_status && modification_status !== '-' && modification_status !== 'null') {
+            // Fetch previous version from DB
+            try {
+                const historyQuery = `
+                    SELECT snapshot_data 
+                    FROM reservation_versions 
+                    WHERE reservation_id = (SELECT id FROM reservations WHERE reservation_no = $1)
+                    ORDER BY change_date DESC 
+                    LIMIT 1
+                `;
+                const historyResult = await pool.query(historyQuery, [reservationNo]);
+
+                if (historyResult.rows.length > 0) {
+                    const snapshot = historyResult.rows[0].snapshot_data;
+                    previousCheckIn = snapshot.check_in_date;
+                    previousCheckOut = snapshot.check_out_date;
+                }
+            } catch (err) {
+                console.error("Error fetching history for email:", err);
+            }
+
+            if (modification_status.includes("Shortened")) {
+                Title = "Booking Shortened";
+                subject = `Guest Booking Shortened (${reservationNo})`;
+            } else if (modification_status.includes("Extended")) {
+                Title = "Booking Extended";
+                subject = `Guest Booking Extension Confirmation (${reservationNo})`;
+            } else if (modification_status.includes("Preponed")) {
+                Title = "Booking Preponed";
+                subject = `Guest Booking Preponed (${reservationNo})`;
+            } else if (modification_status.includes("Postponed")) {
+                Title = "Booking Postponed";
+                subject = `Guest Booking Postponed (${reservationNo})`;
+            } else {
+                Title = "Booking Modified";
+                subject = `Guest Booking Modified (${reservationNo})`;
+            }
+        }
+
         const emailList = guestemail
             .split(",")
             .map(e => e.trim())
@@ -283,8 +328,16 @@ export async function sendEmail(req, res) {
                                                                     <tbody>
                                                                         <tr>
                                                                             <td>
-                                                                                <p style="font:bold 12px tahoma;color:#333333">Check In</p>
-                                                                                <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkin, true)}</span>
+                                                                                ${previousCheckIn && new Date(previousCheckIn).toDateString() !== new Date(checkin).toDateString() ?
+                `<p style="font:bold 12px tahoma;color:#333333">Previous Check In</p>
+                                                                                     <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;margin-bottom:5px;text-decoration:line-through">${formatDateExact(previousCheckIn, true)}</span>
+                                                                                     <br>
+                                                                                     <p style="font:bold 12px tahoma;color:red;margin-top:5px;">${new Date(checkin) < new Date(previousCheckIn) ? 'Preponed Check In' : 'Postponed Check In'}</p>
+                                                                                     <span style="font-family:tahoma;font-size:14px;color:red;font-weight:bold;">${formatDateExact(checkin, true)}</span>`
+                :
+                `<p style="font:bold 12px tahoma;color:#333333">Check In</p>
+                                                                                     <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkin, true)}</span>`
+            }
                                                                                 <br>
                                                                             </td>
                                                                         </tr>
@@ -307,8 +360,10 @@ export async function sendEmail(req, res) {
                                                                                     <p style="font:bold 12px tahoma;color:${(Preponed || isExtended) ? 'red' : '#333333'}">${Preponed ? 'Preponed Check Out Date' : 'Extended Check Out Date'}</p>
                                                                                     <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${additionalGuestsHtml}</span>
                                                                                     <br>
-                                                                                    <p style="font:bold 12px tahoma;color:#333333">Previous Check Out</p>
-                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkout, false)}</span>
+                                                                                    ${previousCheckOut && new Date(previousCheckOut).toDateString() !== new Date(checkout).toDateString() ?
+                    `<p style="font:bold 12px tahoma;color:#333333;margin-top:5px;">Previous Check Out</p>
+                                                                                         <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;margin-bottom:5px;text-decoration:line-through">${formatDateExact(previousCheckOut, false)}</span>`
+                    : ''}
                                                                                     <br>
                                                                                 </td>
                                                                             </tr>
@@ -327,8 +382,16 @@ export async function sendEmail(req, res) {
                                                                     <tbody>
                                                                         <tr>
                                                                             <td width="45%">
-                                                                                <p style="font:bold 12px tahoma;color:#333333">Check Out</p>
-                                                                                <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkout, false)}</span>
+                                                                                ${previousCheckOut && new Date(previousCheckOut).toDateString() !== new Date(checkout).toDateString() ?
+                `<p style="font:bold 12px tahoma;color:#333333">Previous Check Out</p>
+                                                                                     <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;margin-bottom:5px;text-decoration:line-through">${formatDateExact(previousCheckOut, false)}</span>
+                                                                                     <br>
+                                                                                     <p style="font:bold 12px tahoma;color:red;margin-top:5px;">${new Date(checkout) < new Date(previousCheckOut) ? 'Preponed Check Out' : 'Extended Check Out'}</p>
+                                                                                     <span style="font-family:tahoma;font-size:14px;color:red;font-weight:bold;">${formatDateExact(checkout, false)}</span>`
+                :
+                `<p style="font:bold 12px tahoma;color:#333333">Check Out</p>
+                                                                                     <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkout, false)}</span>`
+            }
                                                                                 <br>
                                                                             </td>
                                                                         </tr>
@@ -338,12 +401,12 @@ export async function sendEmail(req, res) {
                                                         </tr>
                                                     </tbody>
                                                 </table>`}
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </td>
-                        </tr>
+                                            </td >
+                                        </tr >
+                                    </tbody >
+                                </table >
+                            </td >
+                        </tr >
 
                         <tr>
                             <td style="padding:0 30px" width="100%">
@@ -501,7 +564,7 @@ export async function sendEmail(req, res) {
                             </td>
                         </tr>
 
-                        <!-- Inclusions - 170 and 370 px tables -->
+                        <!--Inclusions - 170 and 370 px tables-- >
                         <tr>
                             <td width="100%" style="padding:0 30.0px">
                                 <table width="100%" border="0" cellspacing="0" cellpadding="0">
@@ -546,49 +609,21 @@ export async function sendEmail(req, res) {
                                 </table>
                             </td>
                         </tr>
-                        <!-- Terms & Conditions -->
+                        <!--Terms & Conditions-- >
+        <tr>
+            <td width="100%" style="padding:0 30.0px">
+                <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                    <tbody>
                         <tr>
-                            <td width="100%" style="padding:0 30.0px">
-                                <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                            <td style="padding:15.0px 0" width="100%">
+                                <table class="stack-t" cellspacing="0" cellpadding="0" border="0" align="left" width="170">
                                     <tbody>
                                         <tr>
-                                            <td style="padding:15.0px 0" width="100%">
-                                                <table class="stack-t" cellspacing="0" cellpadding="0" border="0" align="left" width="170">
+                                            <td style="padding:5.0px 0" align="left" width="100%">
+                                                <table cellpadding="0" cellspacing="0" width="100%">
                                                     <tbody>
                                                         <tr>
-                                                            <td style="padding:5.0px 0" align="left" width="100%">
-                                                                <table cellpadding="0" cellspacing="0" width="100%">
-                                                                    <tbody>
-                                                                        <tr>
-                                                                            <td width="30%"><span style="color:rgb(74,74,74)"><b><span style="font-family:Helvetica,arial,sans-serif"><span style="color:#f59f0d;font-weight:bold">Terms &amp; Conditions :</span></span></b></span><br></td>
-                                                                        </tr>
-                                                                    </tbody>
-                                                                </table>
-                                                            </td>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                                <table class="stack-t" cellspacing="0" cellpadding="0" border="0" align="left" width="370">
-                                                    <tbody>
-                                                        <tr>
-                                                            <td style="padding-bottom:5.0px" align="left" width="100%">
-                                                                <table cellpadding="0" cellspacing="0" width="100%">
-                                                                    <tbody>
-                                                                        <tr>
-                                                                            <td>
-                                                                                <p style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px;text-align:justify">
-                                                                                    <span style="color:rgb(74,74,74)"><span style="font-family:Helvetica,arial,sans-serif"><span style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px">
-                                                                                        1. Check in & Check out Time 14:00 PM & 11:00 AM <br>
-                                                                                        2. Every guest will have to carry a print of the confirmation along with the company and government photo ID at the time of checking in.<br>
-                                                                                        3. Visitors are permitted in the apartment only between 10:00 AM and 7:00 PM  and maximum of One visitors per day is allowed for each apartment. With Prior email approval from the concerned company admin is required for any visitor entry.<br>
-                                                                                        4. Cancellation Terms: Kindly visit PAJASA website for cancelation terms & Conditions.  https://www.pajasaapartments.com/terms-and-conditions/
-                                                                                    </span></span></span><br>
-                                                                                </p>
-                                                                            </td>
-                                                                        </tr>
-                                                                    </tbody>
-                                                                </table>
-                                                            </td>
+                                                            <td width="30%"><span style="color:rgb(74,74,74)"><b><span style="font-family:Helvetica,arial,sans-serif"><span style="color:#f59f0d;font-weight:bold">Terms &amp; Conditions :</span></span></b></span><br></td>
                                                         </tr>
                                                     </tbody>
                                                 </table>
@@ -596,61 +631,89 @@ export async function sendEmail(req, res) {
                                         </tr>
                                     </tbody>
                                 </table>
-                            </td>
-                        </tr>
-
-                        <!-- Footer Links -->
-                        <tr>
-                            <td style="padding:0 30px"></td>
-                        </tr>
-                        <tr style="background-color:#f59f0d">
-                            <td style="padding:0 30px" width="100%">
-                                <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                <table class="stack-t" cellspacing="0" cellpadding="0" border="0" align="left" width="370">
                                     <tbody>
                                         <tr>
-                                            <td width="100%" style="padding:15px 0">
-                                                <table width="100%" align="left" border="0" cellpadding="0" cellspacing="0">
+                                            <td style="padding-bottom:5.0px" align="left" width="100%">
+                                                <table cellpadding="0" cellspacing="0" width="100%">
                                                     <tbody>
                                                         <tr>
-                                                            <td width="100%" align="left" style="padding:5px 0;color:black;text-align:-webkit-center">
-                                                                <table width="90%" cellspacing="0" cellpadding="0">
-                                                                    <tbody>
-                                                                        <tr style="text-align:-webkit-center">
-                                                                            <td>
-                                                                                <div>
-                                                                                    <div style="display:-webkit-box; display:flex; flex-wrap:wrap; justify-content:center; gap: 10px;">
-                                                                                        <a href="https://www.pajasaapartments.com/in/mumbai/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Mumbai</a>&nbsp;&nbsp;
-                                                                                        <a href="https://www.pajasaapartments.com/in/pune/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Pune</a>&nbsp;&nbsp;
-                                                                                        <a href="https://www.pajasaapartments.com/in/bengaluru/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Bangalore</a>&nbsp;&nbsp;
-                                                                                        <a href="https://www.pajasaapartments.com/in/hyderabad/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Hyderabad</a>&nbsp;&nbsp;
-                                                                                        <a href="http://pajasaapartments.com/in/noida/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Noida</a>&nbsp;&nbsp;
-                                                                                        <a href="https://www.pajasaapartments.com/in/new-delhi/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Delhi</a>&nbsp;&nbsp;
-                                                                                        <a href="https://www.pajasaapartments.com/in/gurugram/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Gurgaon</a>&nbsp;&nbsp;
-                                                                                        <a href="https://www.pajasaapartments.com/in/chennai/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Chennai</a>
-                                                                                    </div>
+                                                            <td>
+                                                                <p style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px;text-align:justify">
+                                                                    <span style="color:rgb(74,74,74)"><span style="font-family:Helvetica,arial,sans-serif"><span style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px">
+                                                                        1. Check in & Check out Time 14:00 PM & 11:00 AM <br>
+                                                                            2. Every guest will have to carry a print of the confirmation along with the company and government photo ID at the time of checking in.<br>
+                                                                                3. Visitors are permitted in the apartment only between 10:00 AM and 7:00 PM  and maximum of One visitors per day is allowed for each apartment. With Prior email approval from the concerned company admin is required for any visitor entry.<br>
+                                                                                    4. Cancellation Terms: Kindly visit PAJASA website for cancelation terms & Conditions.  https://www.pajasaapartments.com/terms-and-conditions/
+                                                                                </span></span></span><br>
+                                                                        </p>
+                                                                    </td>
+                                                                    </tr>
+                                                                </tbody>
+                                                            </table>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Footer Links -->
+                    <tr>
+                        <td style="padding:0 30px"></td>
+                    </tr>
+                    <tr style="background-color:#f59f0d">
+                        <td style="padding:0 30px" width="100%">
+                            <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                <tbody>
+                                    <tr>
+                                        <td width="100%" style="padding:15px 0">
+                                            <table width="100%" align="left" border="0" cellpadding="0" cellspacing="0">
+                                                <tbody>
+                                                    <tr>
+                                                        <td width="100%" align="left" style="padding:5px 0;color:black;text-align:-webkit-center">
+                                                            <table width="90%" cellspacing="0" cellpadding="0">
+                                                                <tbody>
+                                                                    <tr style="text-align:-webkit-center">
+                                                                        <td>
+                                                                            <div>
+                                                                                <div style="display:-webkit-box; display:flex; flex-wrap:wrap; justify-content:center; gap: 10px;">
+                                                                                    <a href="https://www.pajasaapartments.com/in/mumbai/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Mumbai</a>&nbsp;&nbsp;
+                                                                                    <a href="https://www.pajasaapartments.com/in/pune/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Pune</a>&nbsp;&nbsp;
+                                                                                    <a href="https://www.pajasaapartments.com/in/bengaluru/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Bangalore</a>&nbsp;&nbsp;
+                                                                                    <a href="https://www.pajasaapartments.com/in/hyderabad/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Hyderabad</a>&nbsp;&nbsp;
+                                                                                    <a href="http://pajasaapartments.com/in/noida/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Noida</a>&nbsp;&nbsp;
+                                                                                    <a href="https://www.pajasaapartments.com/in/new-delhi/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Delhi</a>&nbsp;&nbsp;
+                                                                                    <a href="https://www.pajasaapartments.com/in/gurugram/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Gurgaon</a>&nbsp;&nbsp;
+                                                                                    <a href="https://www.pajasaapartments.com/in/chennai/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Chennai</a>
                                                                                 </div>
-                                                                            </td>
-                                                                        </tr>
-                                                                    </tbody>
-                                                                </table>
-                                                            </td>
-                                                        </tr>
-                                                    </tbody>
-                                                </table>
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </td>
-                        </tr>
+                                                                            </div>
+                                                                        </td>
+                                                                    </tr>
+                                                                </tbody>
+                                                            </table>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </td>
+                    </tr>
 
-                    </tbody>
-                </table>
-            </td>
-        </tr>
-    </table>
-</body>
-</html>`;
+                </tbody>
+            </table>
+        </td>
+        </tr >
+    </table >
+</body >
+</html > `;
 
         // -----------------------------
         // 1️⃣ SEND EMAIL TO APARTMENT
@@ -681,7 +744,9 @@ export async function sendEmail(req, res) {
             additionalGuests,
             host_payment_mode,
             Title,
-            Preponed
+            Preponed,
+            previousCheckIn,
+            previousCheckOut
         );
 
         if (aptResult.error) {
@@ -752,207 +817,230 @@ async function sendEmailtoApartment(
     additionalGuests,
     host_payment_mode,
     Title,
-    Preponed
+    Preponed,
+    previousCheckIn,
+    previousCheckOut
 ) {
     const additionalGuestsHtml =
         additionalGuests?.length
             ? additionalGuests.map(g => formatDateExact(g.cod, false)).join("<br>")
             : "";
-    const isExtendedTitle = Title.includes("Extended");
-    const subject2 = Preponed ? `Apartments Booking Check out Preponed (${reservationNo}) ` : (isExtendedTitle ? `Apartments Booking Extension Confirmation (${reservationNo})` : `Apartments Booking Confirmation (${reservationNo})`);
+
+    let subject2 = `Apartments Booking Confirmation(${reservationNo})`;
+    if (Title.includes("Extended")) {
+        subject2 = `Apartments Booking Extension Confirmation(${reservationNo})`;
+    } else if (Title.includes("Shortened")) {
+        subject2 = `Apartments Booking Shortened(${reservationNo})`;
+    } else if (Title.includes("Preponed")) {
+        subject2 = `Apartments Booking Preponed(${reservationNo})`;
+    } else if (Title.includes("Postponed")) {
+        subject2 = `Apartments Booking Postponed(${reservationNo})`;
+    } else if (Preponed) {
+        // Legacy fallback
+        subject2 = `Apartments Booking Check out Preponed(${reservationNo})`;
+    }
     const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-    <style>
-        @media only screen and (max-width: 600px) {
-            .main-t { width: 100% !important; max-width: 100% !important; }
-            .stack-t { width: 100% !important; display: block !important; margin-bottom: 10px; }
-            .stack-c { display: block !important; width: 100% !important; box-sizing: border-box; }
-            .img-fix { max-width: 100% !important; height: auto !important; }
-            .pad-fix { padding: 10px !important; }
-            .center-m { text-align: center !important; }
+        <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                        <title>Document</title>
+                        <style>
+                            @media only screen and (max-width: 600px) {
+            .main - t {width: 100% !important; max-width: 100% !important; }
+                            .stack-t {width: 100% !important; display: block !important; margin-bottom: 10px; }
+                            .stack-c {display: block !important; width: 100% !important; box-sizing: border-box; }
+                            .img-fix {max - width: 100% !important; height: auto !important; }
+                            .pad-fix {padding: 10px !important; }
+                            .center-m {text - align: center !important; }
         }
-    </style>
-</head>
-<body style="margin: 0; padding: 0;">
-    <div class="email-container" style="background-color:#ffffff; width:100%;">
-        <table width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#ffffff">
-            <tr>
-                <td align="center">
-                    
-                    <!-- HEADER -->
-                    <table class="main-t" width="630" align="center" border="0" cellpadding="0" cellspacing="0">
-                        <tbody>
-                            <tr>
-                                <td width="100%">
-                                    <table width="100%" align="left" border="0" cellpadding="0" cellspacing="0">
-                                        <tbody>
-                                            <tr>
-                                                <td class="stack-c center-m" align="left" bgcolor="#ffffff" width="40%">
-                                                    <a>
-                                                        <img width="120" border="0" alt="" style="display:block;border:none;outline:none;text-decoration:none" src="https://ci3.googleusercontent.com/meips/ADKq_NYKoMISuvorFIpkwyNeleh158If7bBLNRWg1Ad_3zcs0sq0ivLeKz6svCPsRAdZvz3cXQ65U1--NOMCpIoKot9DPz6V7JAtvgsxKwJ8OFa2IRjJ2lgYhFKs4A=s0-d-e1-ft#https://www.pajasaapartments.com/wp-content/uploads/2019/08/logo.png" class="CToWUd" data-bit="iit" jslog="138226; u014N:xr6bB; 53:WzAsMl0.">
-                                                    </a>
-                                                </td>
-                                                <td class="stack-c center-m" width="45%" valign="middle" align="right">
-                                                    <p style="font:bold 12px tahoma;color:#333333;margin:0;padding-bottom:5px">Booked on: <span style="font-size:12px tahoma;color:#858585;margin:0;padding-bottom:5px">${formatted}</span></p>
-                                                    <p style="font:bold 12px tahoma;color:#333333;margin:0;padding-bottom:5px">Reservation No.: <span style="color:#f59f0d;font-weight:bold;font-size:12px tahoma">${reservationNo}</span></p>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </td>
-                            </tr>
-                            <tr><td><hr></td></tr>
-                        </tbody>
-                    </table>
+                        </style>
+                    </head>
+                    <body style="margin: 0; padding: 0;">
+                        <div class="email-container" style="background-color:#ffffff; width:100%;">
+                            <table width="100%" border="0" cellpadding="0" cellspacing="0" bgcolor="#ffffff">
+                                <tr>
+                                    <td align="center">
 
-                    <!-- MAIN CONTENT -->
-                    <table class="main-t" width="630" cellpadding="0" cellspacing="0" border="0" align="center" style="background:#ffffff;margin:0 auto">
-                        <tbody>
-                            <tr>
-                                <td width="100%" style="padding:20px">
-                                    <table width="100%" align="left" cellpadding="0" cellspacing="0" border="0">
-                                        <tbody>
-                                            <tr>
-                                                <td>
-                                                    <h1 style="font-family:tahoma;font-size:35px;color:#333333;text-align:left;line-height:1.3">
-                                                        ${Title}
-                                                    </h1>
-                                                    <p style="font:bold 12px tahoma;color:#333333;margin:0;padding-bottom:5px">Hi,Veridical Hospitality <br>
-                                                    <br>Thank you for the confirmation</p><br>
-                                                    <p style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">
-                                                        We are happy to confirm booking with following details :
-                                                    </p>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </td>
-                            </tr>
-                        </tbody>
+                                        <!-- HEADER -->
+                                        <table class="main-t" width="630" align="center" border="0" cellpadding="0" cellspacing="0">
+                                            <tbody>
+                                                <tr>
+                                                    <td width="100%">
+                                                        <table width="100%" align="left" border="0" cellpadding="0" cellspacing="0">
+                                                            <tbody>
+                                                                <tr>
+                                                                    <td class="stack-c center-m" align="left" bgcolor="#ffffff" width="40%">
+                                                                        <a>
+                                                                            <img width="120" border="0" alt="" style="display:block;border:none;outline:none;text-decoration:none" src="https://ci3.googleusercontent.com/meips/ADKq_NYKoMISuvorFIpkwyNeleh158If7bBLNRWg1Ad_3zcs0sq0ivLeKz6svCPsRAdZvz3cXQ65U1--NOMCpIoKot9DPz6V7JAtvgsxKwJ8OFa2IRjJ2lgYhFKs4A=s0-d-e1-ft#https://www.pajasaapartments.com/wp-content/uploads/2019/08/logo.png" class="CToWUd" data-bit="iit" jslog="138226; u014N:xr6bB; 53:WzAsMl0.">
+                                                                        </a>
+                                                                    </td>
+                                                                    <td class="stack-c center-m" width="45%" valign="middle" align="right">
+                                                                        <p style="font:bold 12px tahoma;color:#333333;margin:0;padding-bottom:5px">Booked on: <span style="font-size:12px tahoma;color:#858585;margin:0;padding-bottom:5px">${formatted}</span></p>
+                                                                        <p style="font:bold 12px tahoma;color:#333333;margin:0;padding-bottom:5px">Reservation No.: <span style="color:#f59f0d;font-weight:bold;font-size:12px tahoma">${reservationNo}</span></p>
+                                                                    </td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
+                                                    </td>
+                                                </tr>
+                                                <tr><td><hr></td></tr>
+                                            </tbody>
+                                        </table>
 
-                        <tbody>
-                            <tr>
-                                <td style="padding:0 30px" width="100%">
-                                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                                        <tbody>
-                                            <tr>
-                                                <td width="100%" style="padding:0px 0">
-                                                    <!-- Address -->
-                                                    <table class="stack-t" width="290" align="left" border="0" cellpadding="0" cellspacing="0" id="m_2450834815802175052m_-6000102758310738402">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td width="100%" align="left" style="padding:5px;color:#858585">
-                                                                    <p style="color:#3b7dc0;font-family:Arial,Helvetica,sans-serif;font-size:18px;line-height:20px;margin-top:0;margin-bottom:5px;font-weight:normal"><a style="color:#f59f0d;font-weight:bold">Apartment Address</a></p>
-                                                                    <p style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${address1},${address2} <br> ${address3}</p>
-                                                                    <p style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">Contact Person: ${contactperson} </p>
-                                                                    <p style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">Contact Number: <a style="color:#858585"></a><a href="tel:${contactnumber}" target="_blank"> <span style="font-family:tahoma;font-size:14px;color:#858585">${contactnumber}</span></a></p>
+                                        <!-- MAIN CONTENT -->
+                                        <table class="main-t" width="630" cellpadding="0" cellspacing="0" border="0" align="center" style="background:#ffffff;margin:0 auto">
+                                            <tbody>
+                                                <tr>
+                                                    <td width="100%" style="padding:20px">
+                                                        <table width="100%" align="left" cellpadding="0" cellspacing="0" border="0">
+                                                            <tbody>
+                                                                <tr>
+                                                                    <td>
+                                                                        <h1 style="font-family:tahoma;font-size:35px;color:#333333;text-align:left;line-height:1.3">
+                                                                            ${Title}
+                                                                        </h1>
+                                                                        <p style="font:bold 12px tahoma;color:#333333;margin:0;padding-bottom:5px">Hi,Veridical Hospitality <br>
+                                                                            <br>Thank you for the confirmation</p><br>
+                                                                                <p style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">
+                                                                                    We are happy to confirm booking with following details :
+                                                                                </p>
+                                                                            </td>
+                                                                        </tr>
+                                                                        </tbody>
+                                                                    </table>
                                                                 </td>
                                                             </tr>
                                                         </tbody>
-                                                    </table>
-                                                    <!-- Image -->
-                                                    <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td width="100%" align="left" style="padding:5px 20px 5px 0">
-                                                                    <a href="https://www.pajasaapartments.com/?p=8825" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://www.pajasaapartments.com/?p%3D8825&amp;source=gmail&amp;ust=1765475165922000&amp;usg=AOvVaw1mVcIzWsoVD9OwdnFrW9N-">
-                                                                        <img class="img-fix" id="m_2450834815802175052m_-6000102758310738402abc" src="https://ci3.googleusercontent.com/meips/ADKq_Nan-x-C5r-OHd8YR-3NqovJfgaFO0gQmT4ULFq13R2wS5p2jEI08z4Ko_ATD0PUvdQar4Yf-0NIp0XMGZpEnRCxluu1XfVjAq4nYbyjYUVZ1zhJD2TDthP8ChOck3aKWHoOA3qVF9Uo_HEjefi_XkXBu-LRR0TFY8vRVZRnWp1kia87ZNe1A4g4HdD2Ah8phfTaPVSCK7om=s0-d-e1-ft#https://www.pajasaapartments.com/wp-content/uploads/2019/04/3-BHK-Service-Apartment-in-Kanjurmarg-west-in-Mumbai-living-room1.jpg" width="260" alt="Service Apartment" class="CToWUd" data-bit="iit" jslog="138226; u014N:xr6bB; 53:WzAsMl0.">
-                                                                    </a>
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </td>
-                            </tr>
 
-                            <tr>
-                                <td style="padding:0 30px" width="100%">
-                                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                                        <tbody>
-                                            <tr>
-                                                <td width="100%" style="border-bottom:1px solid #d8d8d8;padding:15px 0">
-                                                    <!-- Guest Name -->
-                                                    <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
                                                         <tbody>
                                                             <tr>
-                                                                <td width="270" align="left">
-                                                                    <table width="100%" cellspacing="0" cellpadding="0">
+                                                                <td style="padding:0 30px" width="100%">
+                                                                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
                                                                         <tbody>
                                                                             <tr>
-                                                                                <td width="45%">
-                                                                                    <img style="float:left;padding-right:10px" src="https://ci3.googleusercontent.com/meips/ADKq_NbRo2H3Om_l08yyqDfKMG-HDwxSimiG6UhMkLlaa6e4Uck3degXgdbVVBncdRlOkf-t2KieZgzx326aKca1lVijDqLD7rMiLKYT2CQ=s0-d-e1-ft#http://gos3.ibcdn.com/hjuls8bqkp4op248fja84esc003i.png" class="CToWUd" data-bit="iit">
-                                                                                    <p style="font:bold 12px tahoma;color:#333333">Guest Name</p>
-                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${guestname}</span>
-                                                                                    <br>
+                                                                                <td width="100%" style="padding:0px 0">
+                                                                                    <!-- Address -->
+                                                                                    <table class="stack-t" width="290" align="left" border="0" cellpadding="0" cellspacing="0" id="m_2450834815802175052m_-6000102758310738402">
+                                                                                        <tbody>
+                                                                                            <tr>
+                                                                                                <td width="100%" align="left" style="padding:5px;color:#858585">
+                                                                                                    <p style="color:#3b7dc0;font-family:Arial,Helvetica,sans-serif;font-size:18px;line-height:20px;margin-top:0;margin-bottom:5px;font-weight:normal"><a style="color:#f59f0d;font-weight:bold">Apartment Address</a></p>
+                                                                                                    <p style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${address1},${address2} <br> ${address3}</p>
+                                                                                                    <p style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">Contact Person: ${contactperson} </p>
+                                                                                                    <p style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">Contact Number: <a style="color:#858585"></a><a href="tel:${contactnumber}" target="_blank"> <span style="font-family:tahoma;font-size:14px;color:#858585">${contactnumber}</span></a></p>
+                                                                                                </td>
+                                                                                            </tr>
+                                                                                        </tbody>
+                                                                                    </table>
+                                                                                    <!-- Image -->
+                                                                                    <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
+                                                                                        <tbody>
+                                                                                            <tr>
+                                                                                                <td width="100%" align="left" style="padding:5px 20px 5px 0">
+                                                                                                    <a href="https://www.pajasaapartments.com/?p=8825" target="_blank" data-saferedirecturl="https://www.google.com/url?q=https://www.pajasaapartments.com/?p%3D8825&amp;source=gmail&amp;ust=1765475165922000&amp;usg=AOvVaw1mVcIzWsoVD9OwdnFrW9N-">
+                                                                                                        <img class="img-fix" id="m_2450834815802175052m_-6000102758310738402abc" src="https://ci3.googleusercontent.com/meips/ADKq_Nan-x-C5r-OHd8YR-3NqovJfgaFO0gQmT4ULFq13R2wS5p2jEI08z4Ko_ATD0PUvdQar4Yf-0NIp0XMGZpEnRCxluu1XfVjAq4nYbyjYUVZ1zhJD2TDthP8ChOck3aKWHoOA3qVF9Uo_HEjefi_XkXBu-LRR0TFY8vRVZRnWp1kia87ZNe1A4g4HdD2Ah8phfTaPVSCK7om=s0-d-e1-ft#https://www.pajasaapartments.com/wp-content/uploads/2019/04/3-BHK-Service-Apartment-in-Kanjurmarg-west-in-Mumbai-living-room1.jpg" width="260" alt="Service Apartment" class="CToWUd" data-bit="iit" jslog="138226; u014N:xr6bB; 53:WzAsMl0.">
+                                                                                                    </a>
+                                                                                                </td>
+                                                                                            </tr>
+                                                                                        </tbody>
+                                                                                    </table>
                                                                                 </td>
                                                                             </tr>
                                                                         </tbody>
                                                                     </table>
                                                                 </td>
                                                             </tr>
-                                                        </tbody>
-                                                    </table>
-                                                    <!-- Contact Number -->
-                                                    <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td width="270" align="left">
-                                                                    <table width="100%" cellspacing="0" cellpadding="0">
-                                                                        <tbody>
-                                                                            <tr>
-                                                                                <td>
-                                                                                    <p style="font:bold 12px tahoma;color:#333333">Contact Number</p>
-                                                                                    <p style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${contactnumberguest}</p>
-                                                                                </td>
-                                                                            </tr>
-                                                                        </tbody>
-                                                                    </table>
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </td>
-                            </tr>
 
-                            <tr>
-                                <td style="padding:0 30px" width="100%">
-                                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                                        <tbody>
-                                            <tr>
-                                                <td width="100%" style="border-bottom:1px solid #d8d8d8;padding:15px 0">
-                                                    <!-- Check In -->
-                                                    <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
-                                                        <tbody>
                                                             <tr>
-                                                                <td width="270" align="left" style="padding:5px 0">
-                                                                    <table width="100%" cellspacing="0" cellpadding="0">
+                                                                <td style="padding:0 30px" width="100%">
+                                                                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
                                                                         <tbody>
                                                                             <tr>
-                                                                                <td>
-                                                                                    <p style="font:bold 12px tahoma;color:#333333">Check In</p>
-                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkin, true)}</span> <br>
-                                                                                </td>
-                                                                            </tr>
-                                                                        </tbody>
-                                                                    </table>
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                    <!-- Check Out -->
-                                                    ${additionalGuestsHtml ? `
+                                                                                <td width="100%" style="border-bottom:1px solid #d8d8d8;padding:15px 0">
+                                                                                    <!-- Guest Name -->
+                                                                                    <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
+                                                                                        <tbody>
+                                                                                            <tr>
+                                                                                                <td width="270" align="left">
+                                                                                                    <table width="100%" cellspacing="0" cellpadding="0">
+                                                                                                        <tbody>
+                                                                                                            <tr>
+                                                                                                                <td width="45%">
+                                                                                                                    <img style="float:left;padding-right:10px" src="https://ci3.googleusercontent.com/meips/ADKq_NbRo2H3Om_l08yyqDfKMG-HDwxSimiG6UhMkLlaa6e4Uck3degXgdbVVBncdRlOkf-t2KieZgzx326aKca1lVijDqLD7rMiLKYT2CQ=s0-d-e1-ft#http://gos3.ibcdn.com/hjuls8bqkp4op248fja84esc003i.png" class="CToWUd" data-bit="iit">
+                                                                                                                        <p style="font:bold 12px tahoma;color:#333333">Guest Name</p>
+                                                                                                                        <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${guestname}</span>
+                                                                                                                        <br>
+                                                                                                                        </td>
+                                                                                                                    </tr>
+                                                                                                                </tbody>
+                                                                                                            </table>
+                                                                                                        </td>
+                                                                                                    </tr>
+                                                                                                </tbody>
+                                                                                            </table>
+                                                                                            <!-- Contact Number -->
+                                                                                            <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
+                                                                                                <tbody>
+                                                                                                    <tr>
+                                                                                                        <td width="270" align="left">
+                                                                                                            <table width="100%" cellspacing="0" cellpadding="0">
+                                                                                                                <tbody>
+                                                                                                                    <tr>
+                                                                                                                        <td>
+                                                                                                                            <p style="font:bold 12px tahoma;color:#333333">Contact Number</p>
+                                                                                                                            <p style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${contactnumberguest}</p>
+                                                                                                                        </td>
+                                                                                                                    </tr>
+                                                                                                                </tbody>
+                                                                                                            </table>
+                                                                                                        </td>
+                                                                                                    </tr>
+                                                                                                </tbody>
+                                                                                            </table>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                </tbody>
+                                                                            </table>
+                                                                        </td>
+                                                                    </tr>
+
+                                                                    <tr>
+                                                                        <td style="padding:0 30px" width="100%">
+                                                                            <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                                                                <tbody>
+                                                                                    <tr>
+                                                                                        <td width="100%" style="border-bottom:1px solid #d8d8d8;padding:15px 0">
+                                                                                            <!-- Check In -->
+                                                                                            <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
+                                                                                                <tbody>
+                                                                                                    <tr>
+                                                                                                        <td width="270" align="left" style="padding:5px 0">
+                                                                                                            <table width="100%" cellspacing="0" cellpadding="0">
+                                                                                                                <tbody>
+                                                                                                                    <tr>
+                                                                                                                        <td>
+                                                                                                                            ${previousCheckIn && new Date(previousCheckIn).toDateString() !== new Date(checkin).toDateString() ?
+            `<p style="font:bold 12px tahoma;color:#333333">Previous Check In</p>
+                                                                                                                                 <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;margin-bottom:5px;text-decoration:line-through">${formatDateExact(previousCheckIn, true)}</span>
+                                                                                                                                 <br>
+                                                                                                                                 <p style="font:bold 12px tahoma;color:red;margin-top:5px;">${new Date(checkin) < new Date(previousCheckIn) ? 'Preponed Check In' : 'Postponed Check In'}</p>
+                                                                                                                                 <span style="font-family:tahoma;font-size:14px;color:red;font-weight:bold;">${formatDateExact(checkin, true)}</span>`
+            :
+            `<p style="font:bold 12px tahoma;color:#333333">Check In</p>
+                                                                                                                                 <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkin, true)}</span>`
+        }
+                                                                                                                            <br>
+                                                                                                                        </td>
+                                                                                                                    </tr>
+                                                                                                                </tbody>
+                                                                                                            </table>
+                                                                                                        </td>
+                                                                                                    </tr>
+                                                                                                </tbody>
+                                                                                            </table>
+                                                                                            <!-- Check Out -->
+                                                                                            ${additionalGuestsHtml ? `
                                                         <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
                                                         <tbody>
                                                             <tr>
@@ -964,8 +1052,10 @@ async function sendEmailtoApartment(
                                                                                     <p style="font:bold 12px tahoma;color:${(Preponed || Title.includes('Extended')) ? 'red' : '#333333'}">${Preponed ? 'Preponed Check Out Date' : 'Extended Check Out Date'}</p>
                                                                                     <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${additionalGuestsHtml}</span>
                                                                                     <br>
-                                                                                    <p style="font:bold 12px tahoma;color:#333333">Previous Check Out</p>
-                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkout, false)}</span>
+                                                                                    ${previousCheckOut && new Date(previousCheckOut).toDateString() !== new Date(checkout).toDateString() ?
+                `<p style="font:bold 12px tahoma;color:#333333;margin-top:5px;">Previous Check Out</p>
+                                                                                         <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;margin-bottom:5px;text-decoration:line-through">${formatDateExact(previousCheckOut, false)}</span>`
+                : ''}
                                                                                     <br>
                                                                                 </td>
                                                                             </tr>
@@ -984,8 +1074,16 @@ async function sendEmailtoApartment(
                                                                     <tbody>
                                                                         <tr>
                                                                             <td width="45%">
-                                                                                <p style="font:bold 12px tahoma;color:#333333">Check Out</p>
-                                                                                <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkout, false)}</span>
+                                                                                ${previousCheckOut && new Date(previousCheckOut).toDateString() !== new Date(checkout).toDateString() ?
+            `<p style="font:bold 12px tahoma;color:#333333">Previous Check Out</p>
+                                                                                     <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;margin-bottom:5px;text-decoration:line-through">${formatDateExact(previousCheckOut, false)}</span>
+                                                                                     <br>
+                                                                                     <p style="font:bold 12px tahoma;color:red;margin-top:5px;">${new Date(checkout) < new Date(previousCheckOut) ? 'Preponed Check Out' : 'Extended Check Out'}</p>
+                                                                                     <span style="font-family:tahoma;font-size:14px;color:red;font-weight:bold;">${formatDateExact(checkout, false)}</span>`
+            :
+            `<p style="font:bold 12px tahoma;color:#333333">Check Out</p>
+                                                                                     <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkout, false)}</span>`
+        }
                                                                                 <br>
                                                                             </td>
                                                                         </tr>
@@ -995,319 +1093,319 @@ async function sendEmailtoApartment(
                                                         </tr>
                                                     </tbody>
                                                 </table>`}
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td style="padding:0 30px" width="100%">
-                                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                                        <tbody>
-                                            <tr>
-                                                <td width="100%" style="border-bottom:1px solid #d8d8d8;padding:15px 0">
-                                                    <!-- Chargeable Days -->
-                                                    <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td width="100%" align="left" style="padding:5px 0">
-                                                                    <table width="100%" cellspacing="0" cellpadding="0">
-                                                                        <tbody>
-                                                                            <tr>
-                                                                                <td width="45%">
-                                                                                    <p style="font:bold 12px tahoma;color:#333333">Chargeable Days</p>
-                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${chargeabledays}</span>
-                                                                                </td>
-                                                                            </tr>
-                                                                        </tbody>
-                                                                    </table>
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                    <!-- Amount -->
-                                                    <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td width="100%" align="left" style="padding:5px 0">
-                                                                    <table width="100%" cellspacing="0" cellpadding="0">
-                                                                        <tbody>
-                                                                            <tr>
-                                                                                <td>
-                                                                                    <p style="font:bold 12px tahoma;color:#333333">Amount</p>
-                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${modeofpayment === "Bill to Company" ? "As Per Contract" : amount}</span>
-                                                                                </td>
-                                                                            </tr>
-                                                                        </tbody>
-                                                                    </table>
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </td>
-                            </tr>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                </tbody>
+                                                                            </table>
+                                                                        </td>
+                                                                    </tr>
+                                                                    <tr>
+                                                                        <td style="padding:0 30px" width="100%">
+                                                                            <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                                                                <tbody>
+                                                                                    <tr>
+                                                                                        <td width="100%" style="border-bottom:1px solid #d8d8d8;padding:15px 0">
+                                                                                            <!-- Chargeable Days -->
+                                                                                            <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
+                                                                                                <tbody>
+                                                                                                    <tr>
+                                                                                                        <td width="100%" align="left" style="padding:5px 0">
+                                                                                                            <table width="100%" cellspacing="0" cellpadding="0">
+                                                                                                                <tbody>
+                                                                                                                    <tr>
+                                                                                                                        <td width="45%">
+                                                                                                                            <p style="font:bold 12px tahoma;color:#333333">Chargeable Days</p>
+                                                                                                                            <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${chargeabledays}</span>
+                                                                                                                        </td>
+                                                                                                                    </tr>
+                                                                                                                </tbody>
+                                                                                                            </table>
+                                                                                                        </td>
+                                                                                                    </tr>
+                                                                                                </tbody>
+                                                                                            </table>
+                                                                                            <!-- Amount -->
+                                                                                            <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
+                                                                                                <tbody>
+                                                                                                    <tr>
+                                                                                                        <td width="100%" align="left" style="padding:5px 0">
+                                                                                                            <table width="100%" cellspacing="0" cellpadding="0">
+                                                                                                                <tbody>
+                                                                                                                    <tr>
+                                                                                                                        <td>
+                                                                                                                            <p style="font:bold 12px tahoma;color:#333333">Amount</p>
+                                                                                                                            <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${modeofpayment === "Bill to Company" ? "As Per Contract" : amount}</span>
+                                                                                                                        </td>
+                                                                                                                    </tr>
+                                                                                                                </tbody>
+                                                                                                            </table>
+                                                                                                        </td>
+                                                                                                    </tr>
+                                                                                                </tbody>
+                                                                                            </table>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                </tbody>
+                                                                            </table>
+                                                                        </td>
+                                                                    </tr>
 
-                            <tr>
-                                <td style="padding:0 30px" width="100%">
-                                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                                        <tbody>
-                                            <tr>
-                                                <td width="100%" style="border-bottom:1px solid #d8d8d8;padding:15px 0">
-                                                    <!-- Mode of Payment -->
-                                                    <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td width="100%" align="left" style="padding:5px 0">
-                                                                    <table width="100%" cellspacing="0" cellpadding="0">
-                                                                        <tbody>
-                                                                            <tr>
-                                                                                <td width="45%">
-                                                                                    <p style="font:bold 12px tahoma;color:#333333">Mode of Payment</p>
-                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${host_payment_mode}</span>
-                                                                                </td>
-                                                                            </tr>
-                                                                        </tbody>
-                                                                    </table>
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                    <!-- Guest Type -->
-                                                    <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td width="100%" align="left" style="padding:5px 0">
-                                                                    <table width="100%" cellspacing="0" cellpadding="0">
-                                                                        <tbody>
-                                                                            <tr>
-                                                                                <td>
-                                                                                    <p style="font:bold 12px tahoma;color:#333333">Guest Type</p>
-                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${guesttype}</span>
-                                                                                </td>
-                                                                            </tr>
-                                                                        </tbody>
-                                                                    </table>
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </td>
-                            </tr>
+                                                                    <tr>
+                                                                        <td style="padding:0 30px" width="100%">
+                                                                            <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                                                                <tbody>
+                                                                                    <tr>
+                                                                                        <td width="100%" style="border-bottom:1px solid #d8d8d8;padding:15px 0">
+                                                                                            <!-- Mode of Payment -->
+                                                                                            <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
+                                                                                                <tbody>
+                                                                                                    <tr>
+                                                                                                        <td width="100%" align="left" style="padding:5px 0">
+                                                                                                            <table width="100%" cellspacing="0" cellpadding="0">
+                                                                                                                <tbody>
+                                                                                                                    <tr>
+                                                                                                                        <td width="45%">
+                                                                                                                            <p style="font:bold 12px tahoma;color:#333333">Mode of Payment</p>
+                                                                                                                            <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${host_payment_mode}</span>
+                                                                                                                        </td>
+                                                                                                                    </tr>
+                                                                                                                </tbody>
+                                                                                                            </table>
+                                                                                                        </td>
+                                                                                                    </tr>
+                                                                                                </tbody>
+                                                                                            </table>
+                                                                                            <!-- Guest Type -->
+                                                                                            <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
+                                                                                                <tbody>
+                                                                                                    <tr>
+                                                                                                        <td width="100%" align="left" style="padding:5px 0">
+                                                                                                            <table width="100%" cellspacing="0" cellpadding="0">
+                                                                                                                <tbody>
+                                                                                                                    <tr>
+                                                                                                                        <td>
+                                                                                                                            <p style="font:bold 12px tahoma;color:#333333">Guest Type</p>
+                                                                                                                            <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${guesttype}</span>
+                                                                                                                        </td>
+                                                                                                                    </tr>
+                                                                                                                </tbody>
+                                                                                                            </table>
+                                                                                                        </td>
+                                                                                                    </tr>
+                                                                                                </tbody>
+                                                                                            </table>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                </tbody>
+                                                                            </table>
+                                                                        </td>
+                                                                    </tr>
 
-                            <tr>
-                                <td style="padding:0 30px" width="100%">
-                                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                                        <tbody>
-                                            <tr>
-                                                <td width="100%" style="border-bottom:1px solid #d8d8d8;padding:15px 0">
-                                                    <!-- Room Type -->
-                                                    <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td width="100%" align="left" style="padding:5px 0">
-                                                                    <table width="100%" cellspacing="0" cellpadding="0">
-                                                                        <tbody>
-                                                                            <tr>
-                                                                                <td width="45%">
-                                                                                    <p style="font:bold 12px tahoma;color:#333333">Room Type</p>
-                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${roomtype}</span>
-                                                                                    <br>
-                                                                                </td>
-                                                                            </tr>
-                                                                        </tbody>
-                                                                    </table>
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                    <!-- Occupancy -->
-                                                    <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td width="100%" align="left" style="padding:5px 0">
-                                                                    <table width="100%" cellspacing="0" cellpadding="0">
-                                                                        <tbody>
-                                                                            <tr>
-                                                                                <td width="45%">
-                                                                                    <p style="font:bold 12px tahoma;color:#333333">Occupancy</p>
-                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatOccupancy(occupancy)}</span>
-                                                                                    <br>
-                                                                                </td>
-                                                                            </tr>
-                                                                        </tbody>
-                                                                    </table>
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </td>
-                            </tr>
+                                                                    <tr>
+                                                                        <td style="padding:0 30px" width="100%">
+                                                                            <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                                                                <tbody>
+                                                                                    <tr>
+                                                                                        <td width="100%" style="border-bottom:1px solid #d8d8d8;padding:15px 0">
+                                                                                            <!-- Room Type -->
+                                                                                            <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
+                                                                                                <tbody>
+                                                                                                    <tr>
+                                                                                                        <td width="100%" align="left" style="padding:5px 0">
+                                                                                                            <table width="100%" cellspacing="0" cellpadding="0">
+                                                                                                                <tbody>
+                                                                                                                    <tr>
+                                                                                                                        <td width="45%">
+                                                                                                                            <p style="font:bold 12px tahoma;color:#333333">Room Type</p>
+                                                                                                                            <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${roomtype}</span>
+                                                                                                                            <br>
+                                                                                                                        </td>
+                                                                                                                    </tr>
+                                                                                                                </tbody>
+                                                                                                            </table>
+                                                                                                        </td>
+                                                                                                    </tr>
+                                                                                                </tbody>
+                                                                                            </table>
+                                                                                            <!-- Occupancy -->
+                                                                                            <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
+                                                                                                <tbody>
+                                                                                                    <tr>
+                                                                                                        <td width="100%" align="left" style="padding:5px 0">
+                                                                                                            <table width="100%" cellspacing="0" cellpadding="0">
+                                                                                                                <tbody>
+                                                                                                                    <tr>
+                                                                                                                        <td width="45%">
+                                                                                                                            <p style="font:bold 12px tahoma;color:#333333">Occupancy</p>
+                                                                                                                            <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatOccupancy(occupancy)}</span>
+                                                                                                                            <br>
+                                                                                                                        </td>
+                                                                                                                    </tr>
+                                                                                                                </tbody>
+                                                                                                            </table>
+                                                                                                        </td>
+                                                                                                    </tr>
+                                                                                                </tbody>
+                                                                                            </table>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                </tbody>
+                                                                            </table>
+                                                                        </td>
+                                                                    </tr>
 
-                            <!-- Inclusions -->
-                            <tr>
-                                <td width="100%" style="padding:0 30.0px">
-                                    <table width="100%" border="0" cellspacing="0" cellpadding="0">
-                                        <tbody>
-                                            <tr>
-                                                <td style="border-bottom:1.0px solid rgb(216,216,216);padding:15.0px 0" width="100%">
-                                                    <table class="stack-t" cellspacing="0" cellpadding="0" border="0" align="left" width="170">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td style="padding:5.0px 0" align="left" width="100%">
-                                                                    <table cellpadding="0" cellspacing="0" width="100%">
-                                                                        <tbody>
-                                                                            <tr>
-                                                                                <td width="30%"><span style="color:rgb(74,74,74)"><b><span style="font-family:Helvetica,arial,sans-serif"><span style="color:#f59f0d;font-weight:bold">Inclusions</span></span></b></span><br></td>
-                                                                            </tr>
-                                                                        </tbody>
-                                                                    </table>
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                    <table class="stack-t" cellspacing="0" cellpadding="0" border="0" align="left" width="370">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td style="padding:5.0px 0" align="left" width="100%">
-                                                                    <table cellpadding="0" cellspacing="0" width="100%">
-                                                                        <tbody>
-                                                                            <tr>
-                                                                                <td>
-                                                                                    <span style="color:rgb(74,74,74)"><span style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px">Accommodation,${formatServices(services)}</span></span><br>
-                                                                                </td>
-                                                                            </tr>
-                                                                        </tbody>
-                                                                    </table>
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </td>
-                            </tr>
+                                                                    <!-- Inclusions -->
+                                                                    <tr>
+                                                                        <td width="100%" style="padding:0 30.0px">
+                                                                            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                                                                                <tbody>
+                                                                                    <tr>
+                                                                                        <td style="border-bottom:1.0px solid rgb(216,216,216);padding:15.0px 0" width="100%">
+                                                                                            <table class="stack-t" cellspacing="0" cellpadding="0" border="0" align="left" width="170">
+                                                                                                <tbody>
+                                                                                                    <tr>
+                                                                                                        <td style="padding:5.0px 0" align="left" width="100%">
+                                                                                                            <table cellpadding="0" cellspacing="0" width="100%">
+                                                                                                                <tbody>
+                                                                                                                    <tr>
+                                                                                                                        <td width="30%"><span style="color:rgb(74,74,74)"><b><span style="font-family:Helvetica,arial,sans-serif"><span style="color:#f59f0d;font-weight:bold">Inclusions</span></span></b></span><br></td>
+                                                                                                                    </tr>
+                                                                                                                </tbody>
+                                                                                                            </table>
+                                                                                                        </td>
+                                                                                                    </tr>
+                                                                                                </tbody>
+                                                                                            </table>
+                                                                                            <table class="stack-t" cellspacing="0" cellpadding="0" border="0" align="left" width="370">
+                                                                                                <tbody>
+                                                                                                    <tr>
+                                                                                                        <td style="padding:5.0px 0" align="left" width="100%">
+                                                                                                            <table cellpadding="0" cellspacing="0" width="100%">
+                                                                                                                <tbody>
+                                                                                                                    <tr>
+                                                                                                                        <td>
+                                                                                                                            <span style="color:rgb(74,74,74)"><span style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px">Accommodation,${formatServices(services)}</span></span><br>
+                                                                                                                        </td>
+                                                                                                                    </tr>
+                                                                                                                </tbody>
+                                                                                                            </table>
+                                                                                                        </td>
+                                                                                                    </tr>
+                                                                                                </tbody>
+                                                                                            </table>
+                                                                                        </td>
+                                                                                    </tr>
+                                                                                </tbody>
+                                                                            </table>
+                                                                        </td>
+                                                                    </tr>
 
-                            <!-- Terms & Conditions -->
-                            <tr>
-                                <td width="100%" style="padding:0 30.0px">
-                                    <table width="100%" border="0" cellspacing="0" cellpadding="0">
-                                        <tbody>
-                                            <tr>
-                                                <td style="padding:15.0px 0" width="100%">
-                                                    <table class="stack-t" cellspacing="0" cellpadding="0" border="0" align="left" width="170">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td style="padding:5.0px 0" align="left" width="100%">
-                                                                    <table cellpadding="0" cellspacing="0" width="100%">
-                                                                        <tbody>
-                                                                            <tr>
-                                                                                <td width="30%"><span style="color:rgb(74,74,74)"><b><span style="font-family:Helvetica,arial,sans-serif"><span style="color:#f59f0d;font-weight:bold">Terms &amp; Conditions :</span></span></b></span><br></td>
-                                                                            </tr>
-                                                                        </tbody>
-                                                                    </table>
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                    <table class="stack-t" cellspacing="0" cellpadding="0" border="0" align="left" width="370">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td style="padding-bottom:5.0px" align="left" width="100%">
-                                                                    <table cellpadding="0" cellspacing="0" width="100%">
-                                                                        <tbody>
-                                                                            <tr>
-                                                                                <td>
-                                                                                    <p style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px;text-align:justify">
-                                                                                        <span style="color:rgb(74,74,74)"><span style="font-family:Helvetica,arial,sans-serif"><span style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px">
-                                                                                            1. Check in & Check out Time 14:00 PM & 11:00 AM <br>
-                                                                                            2. Every guest will have to carry a print of the confirmation along with the company and government photo ID at the time of checking in. <br>
-                                                                                            3. Visitors are permitted in the apartment only between 10:00 AM and 7:00 PM  and maximum of One visitors per day is allowed for each apartment. With Prior email approval from the concerned company admin is required for any visitor entry.<br>
-                                                                                            4. Cancellation Terms: Kindly visit PAJASA website for cancelation terms & Conditions.  https://www.pajasaapartments.com/terms-and-conditions/  
-                                                                                        </span></span></span><br>
-                                                                                    </p>
-                                                                                </td>
-                                                                            </tr>
-                                                                        </tbody>
-                                                                    </table>
-                                                                </td>
-                                                            </tr>
-                                                        </tbody>
-                                                    </table>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </td>
-                            </tr>
+                                                                    <!-- Terms & Conditions -->
+                                                                    <tr>
+                                                                        <td width="100%" style="padding:0 30.0px">
+                                                                            <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                                                                                <tbody>
+                                                                                    <tr>
+                                                                                        <td style="padding:15.0px 0" width="100%">
+                                                                                            <table class="stack-t" cellspacing="0" cellpadding="0" border="0" align="left" width="170">
+                                                                                                <tbody>
+                                                                                                    <tr>
+                                                                                                        <td style="padding:5.0px 0" align="left" width="100%">
+                                                                                                            <table cellpadding="0" cellspacing="0" width="100%">
+                                                                                                                <tbody>
+                                                                                                                    <tr>
+                                                                                                                        <td width="30%"><span style="color:rgb(74,74,74)"><b><span style="font-family:Helvetica,arial,sans-serif"><span style="color:#f59f0d;font-weight:bold">Terms &amp; Conditions :</span></span></b></span><br></td>
+                                                                                                                    </tr>
+                                                                                                                </tbody>
+                                                                                                            </table>
+                                                                                                        </td>
+                                                                                                    </tr>
+                                                                                                </tbody>
+                                                                                            </table>
+                                                                                            <table class="stack-t" cellspacing="0" cellpadding="0" border="0" align="left" width="370">
+                                                                                                <tbody>
+                                                                                                    <tr>
+                                                                                                        <td style="padding-bottom:5.0px" align="left" width="100%">
+                                                                                                            <table cellpadding="0" cellspacing="0" width="100%">
+                                                                                                                <tbody>
+                                                                                                                    <tr>
+                                                                                                                        <td>
+                                                                                                                            <p style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px;text-align:justify">
+                                                                                                                                <span style="color:rgb(74,74,74)"><span style="font-family:Helvetica,arial,sans-serif"><span style="font-family:tahoma;font-size:13px;color:#858585;margin:0;padding-bottom:5px">
+                                                                                                                                    1. Check in & Check out Time 14:00 PM & 11:00 AM <br>
+                                                                                                                                        2. Every guest will have to carry a print of the confirmation along with the company and government photo ID at the time of checking in. <br>
+                                                                                                                                            3. Visitors are permitted in the apartment only between 10:00 AM and 7:00 PM  and maximum of One visitors per day is allowed for each apartment. With Prior email approval from the concerned company admin is required for any visitor entry.<br>
+                                                                                                                                                4. Cancellation Terms: Kindly visit PAJASA website for cancelation terms & Conditions.  https://www.pajasaapartments.com/terms-and-conditions/
+                                                                                                                                            </span></span></span><br>
+                                                                                                                                    </p>
+                                                                                                                                </td>
+                                                                                                                                </tr>
+                                                                                                                            </tbody>
+                                                                                                                        </table>
+                                                                                                                    </td>
+                                                                                                                </tr>
+                                                                                                            </tbody>
+                                                                                                        </table>
+                                                                                                    </td>
+                                                                                                </tr>
+                                                                                            </tbody>
+                                                                                        </table>
+                                                                                    </td>
+                                                                                </tr>
 
-                            <!-- Footer -->
-                            <tr>
-                                <td style="padding:0 30px"></td>
-                            </tr>
-                            <tr style="background-color:#f59f0d">
-                                <td style="padding:0 30px" width="100%">
-                                    <table cellpadding="0" cellspacing="0" border="0" width="100%">
-                                        <tbody>
-                                            <tr>
-                                                <td width="100%" style="padding:15px 0">
-                                                    <table width="100%" align="left" border="0" cellpadding="0" cellspacing="0">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td width="100%" align="left" style="padding:5px 0;color:black;text-align:-webkit-center">
-                                                                    <table width="90%" cellspacing="0" cellpadding="0">
-                                                                        <tbody>
-                                                                            <tr style="text-align:-webkit-center">
-                                                                                <td>
-                                                                                    <div>
-                                                                                        <div style="display:-webkit-box; display:flex; flex-wrap:wrap; justify-content:center; gap: 10px;">
-                                                                                        <a href="https://www.pajasaapartments.com/in/mumbai/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Mumbai</a>&nbsp;&nbsp;
-                                                                                        <a href="https://www.pajasaapartments.com/in/pune/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Pune</a>&nbsp;&nbsp;
-                                                                                        <a href="https://www.pajasaapartments.com/in/bengaluru/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Bangalore</a>&nbsp;&nbsp;
-                                                                                        <a href="https://www.pajasaapartments.com/in/hyderabad/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Hyderabad</a>&nbsp;&nbsp;
-                                                                                        <a href="http://pajasaapartments.com/in/noida/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Noida</a>&nbsp;&nbsp;
-                                                                                        <a href="https://www.pajasaapartments.com/in/new-delhi/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Delhi</a>&nbsp;&nbsp;
-                                                                                        <a href="https://www.pajasaapartments.com/in/gurugram/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Gurgaon</a>&nbsp;&nbsp;
-                                                                                        <a href="https://www.pajasaapartments.com/in/chennai/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Chennai</a>
-                                                                                    </div>
-                                                                                    </div>
-                                                                                </td>
-                                                                            </tr>
-                                                                        </tbody>
-                                                                    </table>
+                                                                                <!-- Footer -->
+                                                                                <tr>
+                                                                                    <td style="padding:0 30px"></td>
+                                                                                </tr>
+                                                                                <tr style="background-color:#f59f0d">
+                                                                                    <td style="padding:0 30px" width="100%">
+                                                                                        <table cellpadding="0" cellspacing="0" border="0" width="100%">
+                                                                                            <tbody>
+                                                                                                <tr>
+                                                                                                    <td width="100%" style="padding:15px 0">
+                                                                                                        <table width="100%" align="left" border="0" cellpadding="0" cellspacing="0">
+                                                                                                            <tbody>
+                                                                                                                <tr>
+                                                                                                                    <td width="100%" align="left" style="padding:5px 0;color:black;text-align:-webkit-center">
+                                                                                                                        <table width="90%" cellspacing="0" cellpadding="0">
+                                                                                                                            <tbody>
+                                                                                                                                <tr style="text-align:-webkit-center">
+                                                                                                                                    <td>
+                                                                                                                                        <div>
+                                                                                                                                            <div style="display:-webkit-box; display:flex; flex-wrap:wrap; justify-content:center; gap: 10px;">
+                                                                                                                                                <a href="https://www.pajasaapartments.com/in/mumbai/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Mumbai</a>&nbsp;&nbsp;
+                                                                                                                                                <a href="https://www.pajasaapartments.com/in/pune/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Pune</a>&nbsp;&nbsp;
+                                                                                                                                                <a href="https://www.pajasaapartments.com/in/bengaluru/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Bangalore</a>&nbsp;&nbsp;
+                                                                                                                                                <a href="https://www.pajasaapartments.com/in/hyderabad/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Hyderabad</a>&nbsp;&nbsp;
+                                                                                                                                                <a href="http://pajasaapartments.com/in/noida/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Noida</a>&nbsp;&nbsp;
+                                                                                                                                                <a href="https://www.pajasaapartments.com/in/new-delhi/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Delhi</a>&nbsp;&nbsp;
+                                                                                                                                                <a href="https://www.pajasaapartments.com/in/gurugram/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Gurgaon</a>&nbsp;&nbsp;
+                                                                                                                                                <a href="https://www.pajasaapartments.com/in/chennai/" style="font-family:tahoma;font-size:14px;color:white;margin:0;padding-bottom:4px;text-decoration:none" target="_blank">Chennai</a>
+                                                                                                                                            </div>
+                                                                                                                                        </div>
+                                                                                                                                    </td>
+                                                                                                                                </tr>
+                                                                                                                            </tbody>
+                                                                                                                        </table>
+                                                                                                                    </td>
+                                                                                                                </tr>
+                                                                                                            </tbody>
+                                                                                                        </table>
+                                                                                                    </td>
+                                                                                                </tr>
+                                                                                            </tbody>
+                                                                                        </table>
+                                                                                    </td>
+                                                                                </tr>
+
+                                                                            </tbody>
+                                                                        </table>
                                                                 </td>
                                                             </tr>
-                                                        </tbody>
-                                                    </table>
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </td>
-                            </tr>
-
-                        </tbody>
-                    </table>
-                </td>
-            </tr>
-        </table>
-    </div>
-</body>
-</html>`;
+                                                        </table>
+                                                    </div>
+                                                </body>
+                                            </html>`;
 
     const { data, error } = await resend.emails.send({
         from: "hosting@pajasa.com",
