@@ -357,12 +357,16 @@ async function fetchReservationData(id) {
   const query = `
     SELECT
     r.*,
+      to_char(r.check_in_date, 'YYYY-MM-DD') as check_in_date_str,
+      to_char(r.check_out_date, 'YYYY-MM-DD') as check_out_date_str,
       c.client_name,
-      p.address1, p.city, p.location, p.property_type, p.thumbnail, p.property_url,
-      p.master_bedroom, p.common_bedroom,
-      rai.host_name, rai.host_email, rai.host_base_rate, rai.host_taxes,
-      rai.host_total_amount, rai.contact_person, rai.contact_number as contact_person_number,
-      rai.comments, rai.services, rai.note, rai.apartment_type, rai.host_payment_mode,
+      p.address1, p.address2, p.address3, p.city, p.location, p.property_type, p.thumbnail, p.property_url,
+      p.master_bedroom, p.common_bedroom, p.host_id,
+      hi.host_name, hi.host_email,
+      p.contact_person, p.contact_number,
+      rai.host_base_rate, rai.host_taxes,
+      rai.host_total_amount, rai.apartment_type, rai.host_payment_mode,
+      rai.comments, rai.services, rai.note,
       (
         SELECT json_agg(room_type)
           FROM room_bookings rb
@@ -386,6 +390,7 @@ async function fetchReservationData(id) {
       FROM reservations r
       LEFT JOIN clients c ON r.client_id = c.id
       LEFT JOIN properties p ON r.property_id = p.property_id
+      LEFT JOIN host_information hi ON p.host_id = hi.host_id
       LEFT JOIN reservation_additional_info rai ON r.id = rai.reservation_id
       WHERE r.id = $1
       `;
@@ -394,9 +399,37 @@ async function fetchReservationData(id) {
   if (result.rows.length === 0) return null;
 
   const data = result.rows[0];
+
+  // Use the formatted string dates instead of Date objects
+  if (data.check_in_date_str) {
+    data.check_in_date = data.check_in_date_str;
+  }
+  if (data.check_out_date_str) {
+    data.check_out_date = data.check_out_date_str;
+  }
+
+  // Parse services if it's a string
   if (typeof data.services === 'string') {
     try { data.services = JSON.parse(data.services); } catch (e) { data.services = {}; }
   }
+
+  // Fetch Booking History
+  const historyQuery = `
+    SELECT 
+      to_char(check_in_date, 'YYYY-MM-DD') as check_in_date,
+      to_char(check_out_date, 'YYYY-MM-DD') as check_out_date,
+      status, 
+      modification_tags, 
+      total_tariff, 
+      changed_at,
+      snapshot_data
+    FROM booking_history 
+    WHERE reservation_id = $1 
+    ORDER BY changed_at DESC
+  `;
+  const historyResult = await pool.query(historyQuery, [id]);
+  data.history = historyResult.rows;
+
   return data;
 }
 
@@ -442,42 +475,20 @@ export async function updateReservation(req, res) {
       throw new Error("Reservation ID is required for update");
     }
 
-    // 0. Save Snapshot (History)
-    // We need to fetch the *current* state before updating.
-    // Ideally use a separate client or just query within transaction.
-    // Note: fetchReservationData creates a new query, we should probably run the query part manually here
-    // or just assume we can fetch it. To be safe within transaction, we should query using `client`.
-
-    // FETCH OLD DATA FOR HISTORY
-    // const oldDataQuery = `
-    // SELECT
-    // r.*,
-    //   c.client_name,
-    //   p.address1, p.city, p.location, p.property_type, p.thumbnail, p.property_url,
-    //   rai.host_name, rai.host_email, rai.host_base_rate, rai.host_taxes,
-    //   rai.host_total_amount, rai.contact_person, rai.contact_number as contact_person_number,
-    //   rai.comments, rai.services, rai.note, rai.apartment_type, rai.host_payment_mode,
-    //   (SELECT json_agg(room_type) FROM room_bookings rb WHERE rb.reservation_id = r.id) as "roomSelection",
-    //     (SELECT json_agg(json_build_object(
-    //       'id', rag.id, 'guestName', rag.guest_name, 'cid', rag.cid, 'cod', rag.cod,
-    //       'roomType', rag.room_type, 'occupancy', rag.occupancy, 'address', rag.address,
-    //       'email', rag.email, 'contactNumber', rag.contact_number
-    //     )) FROM reservation_additional_guests rag WHERE rag.reservation_id = r.id) as "additionalGuests"
-    //   FROM reservations r
-    //   LEFT JOIN clients c ON r.client_id = c.id
-    //   LEFT JOIN properties p ON r.property_id = p.property_id
-    //   LEFT JOIN reservation_additional_info rai ON r.id = rai.reservation_id
-    //   WHERE r.id = $1
-    //   `;
-    // const oldResult = await client.query(oldDataQuery, [id]);
-
-    // if (oldResult.rows.length > 0) {
-    //   const oldData = oldResult.rows[0];
-    //   await client.query(
-    //     "INSERT INTO reservation_versions (reservation_id, snapshot_data) VALUES ($1, $2)",
-    //     [id, JSON.stringify(oldData)]
-    //   );
-    // }
+    // 0. Fetch current state for history (Full Snapshot)
+    const oldDataQuery = `
+      SELECT r.*,
+      to_char(r.check_in_date, 'YYYY-MM-DD') as check_in_str,
+      to_char(r.check_out_date, 'YYYY-MM-DD') as check_out_str,
+      (SELECT json_agg(room_type) FROM room_bookings rb WHERE rb.reservation_id = r.id) as "roomSelection",
+      (SELECT json_agg(json_build_object(
+        'id', rag.id, 'guestName', rag.guest_name, 'cid', rag.cid, 'cod', rag.cod,
+        'roomType', rag.room_type, 'occupancy', rag.occupancy, 'address', rag.address,
+        'email', rag.email, 'contactNumber', rag.contact_number
+      )) FROM reservation_additional_guests rag WHERE rag.reservation_id = r.id) as "additionalGuests"
+      FROM reservations r WHERE r.id = $1
+    `;
+    const oldDataResult = await client.query(oldDataQuery, [id]);
 
     // ✅ Ensure date fields come from guestInfo
     const checkInDate =
@@ -489,6 +500,59 @@ export async function updateReservation(req, res) {
         ? guestInfo.checkOutDate
         : null;
 
+    let modificationTags = [];
+    let newStatus = "Modified";
+
+    if (oldDataResult.rows.length > 0) {
+      const oldData = oldDataResult.rows[0];
+
+      // Use DB-formatted strings for old dates
+      const oldInStr = oldData.check_in_str; // "YYYY-MM-DD"
+      const oldOutStr = oldData.check_out_str; // "YYYY-MM-DD"
+
+      // New dates are already "YYYY-MM-DD" from frontend
+      const newInStr = checkInDate;
+      const newOutStr = checkOutDate;
+
+      console.log(`Date Comparison: OldIn=${oldInStr}, NewIn=${newInStr}, OldOut=${oldOutStr}, NewOut=${newOutStr}`);
+
+      // Logic:
+      // Check-in: Increased (Later) -> Postponed, Decreased (Earlier) -> Preponed
+      if (oldInStr && newInStr && oldInStr !== newInStr) {
+        if (newInStr < oldInStr) modificationTags.push("Preponed");
+        else modificationTags.push("Postponed");
+      }
+
+      // Check-out: Increased (Later) -> Extended, Decreased (Earlier) -> Shortened
+      if (oldOutStr && newOutStr && oldOutStr !== newOutStr) {
+        if (newOutStr < oldOutStr) modificationTags.push("Shortened");
+        else modificationTags.push("Extended");
+      }
+
+      // If no date change, keep old status (unless it was already Modified)
+      if (modificationTags.length === 0) {
+        newStatus = oldData.status === 'Cancelled' ? 'Cancelled' : oldData.status;
+      }
+
+      // Save to History with FULL SNAPSHOT
+      await client.query(
+        `INSERT INTO booking_history (reservation_id, check_in_date, check_out_date, status, total_tariff, modification_tags, snapshot_data)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [
+          id,
+          oldData.check_in_date,
+          oldData.check_out_date,
+          oldData.status,
+          oldData.total_tariff,
+          oldData.modification_tags,
+          JSON.stringify(oldData) // Save the entire old record
+        ]
+      );
+    }
+
+    // Convert tags array to string for DB
+    const tagsString = modificationTags.join(', ');
+
     // 1. Update main reservation table
     const updateReservationQuery = `
       UPDATE reservations
@@ -496,8 +560,9 @@ export async function updateReservation(req, res) {
     client_id = $1, property_id = $2, guest_name = $3, guest_email = $4,
       contact_number = $5, check_in_date = $6, check_out_date = $7, check_in_time = $8,
       check_out_time = $9, occupancy = $10, base_rate = $11, taxes = $12, total_tariff = $13,
-      payment_mode = $14, tariff_type = $15, chargeable_days = $16, admin_email = $17,status = $18
-      WHERE id = $19
+      payment_mode = $14, tariff_type = $15, chargeable_days = $16, admin_email = $17, 
+      status = $18, modification_tags = $19
+      WHERE id = $20
       `;
 
     const reservationValues = [
@@ -518,7 +583,8 @@ export async function updateReservation(req, res) {
       guestInfo.tariffType || "",
       toInt(guestInfo.chargeableDays),
       guestInfo.adminEmail || "",
-      "Extended",
+      newStatus,
+      tagsString,
       id
     ];
 
