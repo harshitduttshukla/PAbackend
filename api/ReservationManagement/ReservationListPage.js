@@ -2,44 +2,50 @@ import pool from "../../client.js";
 
 export const getAllReservations = async (req, res) => {
   try {
+
     const query = `
-      SELECT 
-        r.*,
-        STRING_AGG(DISTINCT rb.room_type, ', ') AS room_type,
-        p.property_type,p.address1,p.address2,p.address3,
-        p.Location,p.city,p.Landmark,p.contact_person,
+    SELECT
+    r.*,
+      STRING_AGG(DISTINCT rb.room_type, ', ') AS room_type,
+        p.property_type, p.address1, p.address2, p.address3,
+        p.Location, p.city, p.Landmark, p.contact_person,
         p.contact_number AS contact_person_number,
-        p.caretaker_name,p.caretaker_number,p.property_url,
-        c.client_name,c.state,c.zip_code,
-        rai.apartment_type, rai.host_payment_mode,rai.host_email,
-        COALESCE(
-          (
-            SELECT JSON_AGG(rag.*) 
+          p.caretaker_name, p.caretaker_number, p.property_url,
+          c.client_name, c.state, c.zip_code,
+          rai.apartment_type, rai.host_payment_mode, rai.host_email,
+          COALESCE(
+            (
+              SELECT JSON_AGG(rag.*) 
             FROM reservation_additional_guests rag 
             WHERE rag.reservation_id = r.id
-          ), 
+          ),
           '[]'
         ) AS "additionalGuests",
-        COALESCE(rai.services, '{}'::jsonb) AS services
+  COALESCE(rai.services, '{}':: jsonb) AS services,
+    (
+      SELECT JSON_AGG(t) FROM(
+        SELECT * FROM booking_history WHERE reservation_id = r.id ORDER BY changed_at DESC LIMIT 1
+      ) t
+        ) AS history
       FROM reservations r
       LEFT JOIN room_bookings rb ON r.id = rb.reservation_id
       JOIN properties p ON r.property_id = p.property_id
       JOIN clients c ON r.client_id = c.id
       LEFT JOIN reservation_additional_info rai ON r.id = rai.reservation_id
-      GROUP BY 
-        r.id,
-        p.property_type,p.address1,p.address2,p.address3,
-        p.Location,p.city,p.Landmark,p.contact_person,
-        p.contact_number,
-        p.caretaker_name,p.caretaker_number,p.property_url,
-        c.client_name,c.state,c.zip_code,
-        rai.apartment_type, rai.host_payment_mode,rai.host_email,
-        rai.services
+      GROUP BY
+r.id,
+  p.property_type, p.address1, p.address2, p.address3,
+  p.Location, p.city, p.Landmark, p.contact_person,
+  p.contact_number,
+  p.caretaker_name, p.caretaker_number, p.property_url,
+  c.client_name, c.state, c.zip_code,
+  rai.apartment_type, rai.host_payment_mode, rai.host_email,
+  rai.services
       ORDER BY r.created_at DESC
     `;
 
     const result = await pool.query(query);
-    
+
 
     res.status(200).json({ data: result.rows });
   } catch (error) {
@@ -85,7 +91,7 @@ export async function deleteReservation(req, res) {
     UPDATE reservations
     SET status = 'Cancelled'
     WHERE id = $1
-    `;
+  `;
     await pool.query(deleteReservationQuery, [reservationId]);
 
     await pool.query("COMMIT"); // ✅ Commit transaction
