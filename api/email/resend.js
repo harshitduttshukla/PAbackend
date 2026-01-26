@@ -43,8 +43,37 @@ export async function sendEmail(req, res) {
             services,
             additionalGuests,
             status,
-            attachments
+            attachments,
+            modification_tags
         } = req.body;
+
+        // ✅ Fetch LAST updated version from history (most recent before current)
+        let originalBooking = null;
+        try {
+            const historyQuery = `
+                SELECT 
+                    check_in_date as old_check_in_date, 
+                    check_out_date as old_check_out_date,
+                    snapshot_data->>'check_in_time' as old_check_in_time,
+                    snapshot_data->>'check_out_time' as old_check_out_time,
+                    changed_at
+                FROM booking_history
+                WHERE reservation_id = (SELECT id FROM reservations WHERE reservation_no = $1)
+                ORDER BY changed_at DESC  -- ✅ Get LAST updated version (most recent)
+                LIMIT 1
+            `;
+            const historyResult = await pool.query(historyQuery, [reservationNo]);
+            if (historyResult.rows.length > 0) {
+                originalBooking = historyResult.rows[0];
+                console.log('📜 Found LAST updated booking from history:', originalBooking);
+                console.log('   Changed at:', originalBooking.changed_at);
+            } else {
+                console.log('⚠️ No booking history found for reservation:', reservationNo);
+            }
+        } catch (histError) {
+            console.log('⚠️ Error fetching booking history:', histError.message);
+        }
+
         // Convert guestemail -> array
 
         const additionalGuestsDate = additionalGuests?.length ? additionalGuests.map(g => new Date(g.cod)) : []
@@ -56,10 +85,88 @@ export async function sendEmail(req, res) {
         }
 
 
-        const isExtended = (status === 'Extended' || status === 'extended') || (additionalGuests?.length > 0 && !Preponed);
 
-        const Title = Preponed ? `Check Out Preponed` : (isExtended ? `Booking Extended` : `Booking Confirmed`);
-        const subject = Preponed ? `Guest Booking Check out Preponed (${reservationNo}) ` : (isExtended ? `Guest Booking Extension Confirmation (${reservationNo})` : `Guest Booking Confirmation (${reservationNo})`);
+        // ✅ Determine modification type based on originalBooking
+        let modificationType = null;
+        let Title = 'Booking Confirmed';
+        let subject = `Guest Booking Confirmation (${reservationNo})`;
+
+        console.log('🔍 DEBUG - Email Title Logic:');
+        console.log('  - originalBooking:', originalBooking ? 'EXISTS' : 'NULL');
+        console.log('  - modification_tags:', modification_tags);
+        console.log('  - status:', status);
+        console.log('  - checkin:', checkin);
+        console.log('  - checkout:', checkout);
+
+        if (originalBooking) {
+            const oldCheckIn = new Date(originalBooking.old_check_in_date);
+            const oldCheckOut = new Date(originalBooking.old_check_out_date);
+            const newCheckIn = new Date(checkin);
+            const newCheckOut = new Date(checkout);
+
+            console.log('  - Old Check-In:', oldCheckIn.toISOString());
+            console.log('  - New Check-In:', newCheckIn.toISOString());
+            console.log('  - Old Check-Out:', oldCheckOut.toISOString());
+            console.log('  - New Check-Out:', newCheckOut.toISOString());
+
+            const checkInChanged = oldCheckIn.getTime() !== newCheckIn.getTime();
+            const checkOutChanged = oldCheckOut.getTime() !== newCheckOut.getTime();
+
+            console.log('  - Check-In Changed:', checkInChanged);
+            console.log('  - Check-Out Changed:', checkOutChanged);
+
+            if (checkInChanged && newCheckIn < oldCheckIn) {
+                modificationType = 'preponed';
+                Title = 'Booking Preponed';
+                subject = `Guest Booking Preponed (${reservationNo})`;
+            } else if (checkInChanged && newCheckIn > oldCheckIn) {
+                modificationType = 'postponed';
+                Title = 'Booking Postponed';
+                subject = `Guest Booking Postponed (${reservationNo})`;
+            } else if (checkOutChanged && newCheckOut > oldCheckOut) {
+                modificationType = 'extended';
+                Title = 'Booking Extended';
+                subject = `Guest Booking Extension Confirmation (${reservationNo})`;
+            } else if (checkOutChanged && newCheckOut < oldCheckOut) {
+                modificationType = 'shortened';
+                Title = 'Booking Shortened';
+                subject = `Guest Booking Shortened (${reservationNo})`;
+            } else if (checkInChanged || checkOutChanged) {
+                modificationType = 'modified';
+                Title = 'Booking Modified';
+                subject = `Guest Booking Modified (${reservationNo})`;
+            }
+        } else if (modification_tags) {
+            // ✅ Fallback: Use modification_tags if no booking history
+            const tags = modification_tags.toLowerCase();
+            console.log('📋 Using modification_tags fallback:', modification_tags);
+
+            if (tags.includes('extended')) {
+                modificationType = 'extended';
+                Title = 'Booking Extended';
+                subject = `Guest Booking Extension Confirmation (${reservationNo})`;
+            } else if (tags.includes('shortened')) {
+                modificationType = 'shortened';
+                Title = 'Booking Shortened';
+                subject = `Guest Booking Shortened (${reservationNo})`;
+            } else if (tags.includes('preponed')) {
+                modificationType = 'preponed';
+                Title = 'Booking Preponed';
+                subject = `Guest Booking Preponed (${reservationNo})`;
+            } else if (tags.includes('postponed')) {
+                modificationType = 'postponed';
+                Title = 'Booking Postponed';
+                subject = `Guest Booking Postponed (${reservationNo})`;
+            }
+        }
+
+        console.log('✅ FINAL RESULT:');
+        console.log('  - modificationType:', modificationType);
+        console.log('  - Title:', Title);
+        console.log('  - Subject:', subject);
+
+        const isExtended = modificationType === 'extended' || (status === 'Extended' || status === 'extended') || (additionalGuests?.length > 0 && !Preponed);
+
         const emailList = guestemail
             .split(",")
             .map(e => e.trim())
@@ -284,7 +391,22 @@ export async function sendEmail(req, res) {
                                                                         <tr>
                                                                             <td>
                                                                                 <p style="font:bold 12px tahoma;color:#333333">Check In</p>
-                                                                                <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkin, true)}</span>
+                                                                                ${originalBooking && (modificationType === 'preponed' || modificationType === 'postponed') ? `
+                                                                                    <div style="border:2px solid #f59f0d;border-radius:8px;padding:12px;margin-top:8px;background:#fff9f0">
+                                                                                        <p style="font:bold 10px tahoma;color:#666;margin:0 0 8px 0">Previous:</p>
+                                                                                        <span style="font-family:tahoma;font-size:13px;color:#999;text-decoration:line-through;display:block;margin-bottom:12px">
+                                                                                            ${formatDateExact(originalBooking.old_check_in_date, true)} at ${originalBooking.old_check_in_time}
+                                                                                        </span>
+                                                                                        <p style="font:bold 10px tahoma;color:red;margin:0 0 8px 0">Current:</p>
+                                                                                        <span style="font-family:tahoma;font-size:16px;color:red;font-weight:bold;display:block">
+                                                                                            ${formatDateExact(checkin, true)} at ${check_in_time}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                ` : `
+                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">
+                                                                                        ${formatDateExact(checkin, true)} at ${check_in_time}
+                                                                                    </span>
+                                                                                `}
                                                                                 <br>
                                                                             </td>
                                                                         </tr>
@@ -318,7 +440,7 @@ export async function sendEmail(req, res) {
                                                             </tr>
                                                         </tbody>
                                                     </table>
-                                                    `: `
+                                                `: `
                                                 <table class="stack-t" width="270" align="left" border="0" cellpadding="0" cellspacing="0">
                                                     <tbody>
                                                         <tr>
@@ -328,7 +450,22 @@ export async function sendEmail(req, res) {
                                                                         <tr>
                                                                             <td width="45%">
                                                                                 <p style="font:bold 12px tahoma;color:#333333">Check Out</p>
-                                                                                <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkout, false)}</span>
+                                                                                ${originalBooking && (modificationType === 'extended' || modificationType === 'shortened') ? `
+                                                                                    <div style="border:2px solid #f59f0d;border-radius:8px;padding:12px;margin-top:8px;background:#fff9f0">
+                                                                                        <p style="font:bold 10px tahoma;color:#666;margin:0 0 8px 0">Previous:</p>
+                                                                                        <span style="font-family:tahoma;font-size:13px;color:#999;text-decoration:line-through;display:block;margin-bottom:12px">
+                                                                                            ${formatDateExact(originalBooking.old_check_out_date, false)} at ${originalBooking.old_check_out_time}
+                                                                                        </span>
+                                                                                        <p style="font:bold 10px tahoma;color:red;margin:0 0 8px 0">Current:</p>
+                                                                                        <span style="font-family:tahoma;font-size:16px;color:red;font-weight:bold;display:block">
+                                                                                            ${formatDateExact(checkout, false)} at ${check_out_time}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                ` : `
+                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">
+                                                                                        ${formatDateExact(checkout, false)} at ${check_out_time}
+                                                                                    </span>
+                                                                                `}
                                                                                 <br>
                                                                             </td>
                                                                         </tr>
@@ -681,7 +818,11 @@ export async function sendEmail(req, res) {
             additionalGuests,
             host_payment_mode,
             Title,
-            Preponed
+            Preponed,
+            originalBooking,
+            check_in_time,
+            check_out_time,
+            modificationType  // ✅ Add this
         );
 
         if (aptResult.error) {
@@ -752,7 +893,11 @@ async function sendEmailtoApartment(
     additionalGuests,
     host_payment_mode,
     Title,
-    Preponed
+    Preponed,
+    originalBooking,
+    check_in_time,
+    check_out_time,
+    modificationType  // ✅ Add this
 ) {
     const additionalGuestsHtml =
         additionalGuests?.length
@@ -942,7 +1087,22 @@ async function sendEmailtoApartment(
                                                                             <tr>
                                                                                 <td>
                                                                                     <p style="font:bold 12px tahoma;color:#333333">Check In</p>
-                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkin, true)}</span> <br>
+                                                                                    ${originalBooking && (modificationType === 'preponed' || modificationType === 'postponed') ? `
+                                                                                        <div style="border:2px solid #f59f0d;border-radius:8px;padding:12px;margin-top:8px;background:#fff9f0">
+                                                                                            <p style="font:bold 10px tahoma;color:#666;margin:0 0 8px 0">Previous:</p>
+                                                                                            <span style="font-family:tahoma;font-size:13px;color:#999;text-decoration:line-through;display:block;margin-bottom:12px">
+                                                                                                ${formatDateExact(originalBooking.old_check_in_date, true)} at ${originalBooking.old_check_in_time}
+                                                                                            </span>
+                                                                                            <p style="font:bold 10px tahoma;color:red;margin:0 0 8px 0">Current:</p>
+                                                                                            <span style="font-family:tahoma;font-size:16px;color:red;font-weight:bold;display:block">
+                                                                                                ${formatDateExact(checkin, true)} at ${check_in_time}
+                                                                                            </span>
+                                                                                        </div>
+                                                                                    ` : `
+                                                                                        <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">
+                                                                                            ${formatDateExact(checkin, true)} at ${check_in_time}
+                                                                                        </span>
+                                                                                    `} <br>
                                                                                 </td>
                                                                             </tr>
                                                                         </tbody>
@@ -985,7 +1145,22 @@ async function sendEmailtoApartment(
                                                                         <tr>
                                                                             <td width="45%">
                                                                                 <p style="font:bold 12px tahoma;color:#333333">Check Out</p>
-                                                                                <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">${formatDateExact(checkout, false)}</span>
+                                                                                ${originalBooking && (modificationType === 'extended' || modificationType === 'shortened') ? `
+                                                                                    <div style="border:2px solid #f59f0d;border-radius:8px;padding:12px;margin-top:8px;background:#fff9f0">
+                                                                                        <p style="font:bold 10px tahoma;color:#666;margin:0 0 8px 0">Previous:</p>
+                                                                                        <span style="font-family:tahoma;font-size:13px;color:#999;text-decoration:line-through;display:block;margin-bottom:12px">
+                                                                                            ${formatDateExact(originalBooking.old_check_out_date, false)} at ${originalBooking.old_check_out_time}
+                                                                                        </span>
+                                                                                        <p style="font:bold 10px tahoma;color:red;margin:0 0 8px 0">Current:</p>
+                                                                                        <span style="font-family:tahoma;font-size:16px;color:red;font-weight:bold;display:block">
+                                                                                            ${formatDateExact(checkout, false)} at ${check_out_time}
+                                                                                        </span>
+                                                                                    </div>
+                                                                                ` : `
+                                                                                    <span style="font-family:tahoma;font-size:14px;color:#858585;margin:0;padding-bottom:5px">
+                                                                                        ${formatDateExact(checkout, false)} at ${check_out_time}
+                                                                                    </span>
+                                                                                `}
                                                                                 <br>
                                                                             </td>
                                                                         </tr>
